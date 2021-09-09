@@ -218,6 +218,42 @@ func (s *SearchResult) PrettyPrint(indent int) {
 	}
 }
 
+// SearchAsyncResponseType describes the SearchAsyncResponse content type
+type SearchAsyncResponseType uint8
+
+const (
+	SearchAsyncResponseTypeNone SearchAsyncResponseType = iota
+	SearchAsyncResponseTypeEntry
+	SearchAsyncResponseTypeReferral
+	SearchAsyncResponseTypeControl
+)
+
+// SearchAsyncResponse holds the server's response message to an async search request
+type SearchAsyncResponse struct {
+	// Type indicates the SearchAsyncResponse type
+	Type SearchAsyncResponseType
+	// Entry is the received entry, only set if Type is SearchAsyncResponseTypeEntry
+	Entry *Entry
+	// Referral is the received referral, only set if Type is SearchAsyncResponseTypeReferral
+	Referral string
+	// Control is the received control, only set if Type is SearchAsyncResponseTypeControl
+	Control Control
+	// closed indicates that the request is finished
+	closed bool
+	// err holds the encountered error while processing server's response, if any
+	err error
+}
+
+// Closed returns true if the request is finished
+func (r *SearchAsyncResponse) Closed() bool {
+	return r.closed
+}
+
+// Err returns the encountered error while processing server's response, if any
+func (r *SearchAsyncResponse) Err() error {
+	return r.err
+}
+
 // SearchRequest represents a search request to send to the server
 type SearchRequest struct {
 	BaseDN       string
@@ -400,6 +436,59 @@ func (l *Conn) Search(searchRequest *SearchRequest) (*SearchResult, error) {
 			result.Referrals = append(result.Referrals, packet.Children[1].Children[0].Value.(string))
 		}
 	}
+}
+
+// SearchAsync performs the given search request asynchronously, it returns a SearchAsyncResponse channel which will be
+// closed when the request finished and an error, not nil if the request to the server failed
+func (l *Conn) SearchAsync(searchRequest *SearchRequest) (<-chan *SearchAsyncResponse, error) {
+	msgCtx, err := l.doRequest(searchRequest)
+	if err != nil {
+		return nil, err
+	}
+	responses := make(chan *SearchAsyncResponse)
+	go func() {
+		defer l.finishMessage(msgCtx)
+		defer close(responses)
+		for {
+			packet, err := l.readPacket(msgCtx)
+			if err != nil {
+				responses <- &SearchAsyncResponse{closed: true, err: err}
+				return
+			}
+
+			switch packet.Children[1].Tag {
+			case 4:
+				entry := &Entry{
+					DN:         packet.Children[1].Children[0].Value.(string),
+					Attributes: unpackAttributes(packet.Children[1].Children[1].Children),
+				}
+				responses <- &SearchAsyncResponse{Type: SearchAsyncResponseTypeEntry, Entry: entry}
+			case 5:
+				err := GetLDAPError(packet)
+				if err != nil {
+					responses <- &SearchAsyncResponse{closed: true, err: err}
+					return
+				}
+				var response SearchAsyncResponse
+				if len(packet.Children) == 3 {
+					for _, child := range packet.Children[2].Children {
+						decodedChild, err := DecodeControl(child)
+						if err != nil {
+							responses <- &SearchAsyncResponse{closed: true, err: fmt.Errorf("failed to decode child control: %s", err)}
+							return
+						}
+						response = SearchAsyncResponse{Type: SearchAsyncResponseTypeControl, Control: decodedChild}
+					}
+				}
+				response.closed = true
+				responses <- &response
+				return
+			case 19:
+				responses <- &SearchAsyncResponse{Type: SearchAsyncResponseTypeReferral, Referral: packet.Children[1].Children[0].Value.(string)}
+			}
+		}
+	}()
+	return responses, nil
 }
 
 // unpackAttributes will extract all given LDAP attributes and it's values

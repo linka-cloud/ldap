@@ -89,6 +89,45 @@ func TestSearch(t *testing.T) {
 	t.Logf("TestSearch: %s -> num of entries = %d", searchRequest.Filter, len(sr.Entries))
 }
 
+func TestSearchAsync(t *testing.T) {
+	l, err := DialURL(ldapServer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+
+	searchRequest := NewSearchRequest(
+		baseDN,
+		ScopeWholeSubtree, DerefAlways, 0, 0, false,
+		filter[0],
+		attributes,
+		nil)
+
+	var entries []*Entry
+	responses, err := l.SearchAsync(searchRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for res := range responses {
+		if err := res.Err(); err != nil {
+			t.Error(err)
+			break
+		}
+		if res.Closed() {
+			break
+		}
+		switch res.Type {
+		case SearchAsyncResponseTypeEntry:
+			entries = append(entries, res.Entry)
+		case SearchAsyncResponseTypeReferral:
+			t.Logf("Received Referral: %s", res.Referral)
+		case SearchAsyncResponseTypeControl:
+			t.Logf("Received Control: %s", res.Control)
+		}
+	}
+	t.Logf("TestSearch: %s -> num of entries = %d", searchRequest.Filter, len(entries))
+}
+
 func TestSearchStartTLS(t *testing.T) {
 	l, err := DialURL(ldapServer)
 	if err != nil {
