@@ -95,9 +95,13 @@ func (state *GSSAPIState) GSSAPIStep(input []byte) ([]byte, error) {
 		key = state.Subkey
 	}
 
-	_, err = token.Verify(key, keyusage.GSSAPI_ACCEPTOR_SEAL)
-	if err != nil {
-		return nil, err
+	// verify if flags indicate seal (contains 0b10)
+	// https://datatracker.ietf.org/doc/html/rfc4121#section-4.2.2
+	if (token.Flags & 0b10) != 0 {
+		_, err = token.Verify(key, keyusage.GSSAPI_ACCEPTOR_SEAL)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	pl := token.Payload

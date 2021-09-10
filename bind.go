@@ -15,6 +15,7 @@ import (
 	gssapi "github.com/jcmturner/gokrb5/v8/client"
 	k5conf "github.com/jcmturner/gokrb5/v8/config"
 	k5creds "github.com/jcmturner/gokrb5/v8/credentials"
+	k5keytab "github.com/jcmturner/gokrb5/v8/keytab"
 	k5types "github.com/jcmturner/gokrb5/v8/types"
 )
 
@@ -545,15 +546,15 @@ func (l *Conn) NTLMChallengeBind(ntlmBindRequest *NTLMBindRequest) (*NTLMBindRes
 
 // GSSAPI Bind using gokrb5
 type GSSAPIBindRequest struct {
-	// Service Principal Name to try to get a service ticket for. With LDAP in
+	// SPN is the Service Principal Name to try to get a service ticket for. With LDAP in
 	// most cases this will be "ldap/<hostname>"
 	SPN string
 	// Authorization entity to authenticate as
 	AuthZID string
-	// KRB5 client as an abstraction over Credentials coming from a keytab,
+	// Client is the KRB5 client as an abstraction over Credentials coming from a keytab,
 	// ccache or freshly acquired from the KDC
-	client *gssapi.Client
-	// Token
+	Client *gssapi.Client
+	// token
 	token []byte
 	// Are we on the last step
 	done bool
@@ -561,12 +562,12 @@ type GSSAPIBindRequest struct {
 	Controls []Control
 }
 
-// GSSAPI Bind using your CCache with an empty AuthZID
+// GSSAPICCBind performs GSSAPI bind using your CCache with an empty AuthZID
 func (l *Conn) GSSAPICCBind(confpath, cpath, spn string) error {
 	return l.GSSAPICCBindZ(confpath, cpath, "", spn)
 }
 
-// GSSAPI Bind using your CCache with a set AuthZID
+// GSSAPICCBindZ performs GSSAPI bind using your CCache with a set AuthZID
 func (l *Conn) GSSAPICCBindZ(confpath, cpath, authzid, spn string) error {
 	config, err := k5conf.Load(confpath)
 	if err != nil {
@@ -586,7 +587,7 @@ func (l *Conn) GSSAPICCBindZ(confpath, cpath, authzid, spn string) error {
 	req := &GSSAPIBindRequest{
 		SPN:     spn,
 		AuthZID: authzid,
-		client:  client,
+		Client:  client,
 	}
 	_, err = l.GSSAPIBind(req)
 	return err
@@ -619,7 +620,7 @@ func (l *Conn) GSSAPIBind(req *GSSAPIBindRequest) (*GSSAPIBindResult, error) {
 		Controls: make([]Control, 0),
 	}
 
-	state, err := InitContext(req.client, req.SPN, req.AuthZID)
+	state, err := InitContext(req.Client, req.SPN, req.AuthZID)
 	if err != nil {
 		return nil, err
 	}
