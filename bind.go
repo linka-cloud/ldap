@@ -15,7 +15,6 @@ import (
 	gssapi "github.com/jcmturner/gokrb5/v8/client"
 	k5conf "github.com/jcmturner/gokrb5/v8/config"
 	k5creds "github.com/jcmturner/gokrb5/v8/credentials"
-	k5keytab "github.com/jcmturner/gokrb5/v8/keytab"
 	k5types "github.com/jcmturner/gokrb5/v8/types"
 )
 
@@ -544,7 +543,7 @@ func (l *Conn) NTLMChallengeBind(ntlmBindRequest *NTLMBindRequest) (*NTLMBindRes
 	return result, err
 }
 
-// GSSAPI Bind using gokrb5
+// GSSAPIBindRequest using gokrb5
 type GSSAPIBindRequest struct {
 	// SPN is the Service Principal Name to try to get a service ticket for. With LDAP in
 	// most cases this will be "ldap/<hostname>"
@@ -560,6 +559,16 @@ type GSSAPIBindRequest struct {
 	done bool
 	// Controls are optional controls to send with the bind request
 	Controls []Control
+}
+
+// NewGSSAPIBindRequest contructs a GSSAPIBindRequest
+func NewGSSAPIBindRequest(spn, authz string, client *gssapi.Client, controls []Control) *GSSAPIBindRequest {
+	return &GSSAPIBindRequest {
+		SPN: spn,
+		AuthZID: authz,
+		Client: client,
+		Controls: controls,
+	}
 }
 
 // GSSAPICCBind performs GSSAPI bind using your CCache with an empty AuthZID
@@ -593,6 +602,7 @@ func (l *Conn) GSSAPICCBindZ(confpath, cpath, authzid, spn string) error {
 	return err
 }
 
+// GSSAPIBindResult contains the response of a GSSAPIBind request
 type GSSAPIBindResult struct {
 	Subkey   k5types.EncryptionKey
 	Controls []Control
