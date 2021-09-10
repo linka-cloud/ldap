@@ -1,6 +1,7 @@
 package ldap
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sort"
@@ -440,19 +441,18 @@ func (l *Conn) Search(searchRequest *SearchRequest) (*SearchResult, error) {
 
 // SearchAsync performs the given search request asynchronously, it returns a SearchAsyncResponse channel which will be
 // closed when the request finished and an error, not nil if the request to the server failed
-func (l *Conn) SearchAsync(searchRequest *SearchRequest) (<-chan *SearchAsyncResponse, error) {
+func (l *Conn) SearchAsync(ctx context.Context, searchRequest *SearchRequest) (<-chan *SearchAsyncResponse, error) {
 	msgCtx, err := l.doRequest(searchRequest)
 	if err != nil {
 		return nil, err
 	}
-	responses := make(chan *SearchAsyncResponse)
-	go func() {
-		defer l.finishMessage(msgCtx)
-		defer close(responses)
+	responses := make(chan *SearchAsyncResponse, 1)
+	ch := make(chan *SearchAsyncResponse, 1)
+	rcv := func() {
 		for {
 			packet, err := l.readPacket(msgCtx)
 			if err != nil {
-				responses <- &SearchAsyncResponse{closed: true, err: err}
+				ch <- &SearchAsyncResponse{closed: true, err: err}
 				return
 			}
 
@@ -462,11 +462,11 @@ func (l *Conn) SearchAsync(searchRequest *SearchRequest) (<-chan *SearchAsyncRes
 					DN:         packet.Children[1].Children[0].Value.(string),
 					Attributes: unpackAttributes(packet.Children[1].Children[1].Children),
 				}
-				responses <- &SearchAsyncResponse{Type: SearchAsyncResponseTypeEntry, Entry: entry}
+				ch <- &SearchAsyncResponse{Type: SearchAsyncResponseTypeEntry, Entry: entry}
 			case 5:
 				err := GetLDAPError(packet)
 				if err != nil {
-					responses <- &SearchAsyncResponse{closed: true, err: err}
+					ch <- &SearchAsyncResponse{closed: true, err: err}
 					return
 				}
 				var response SearchAsyncResponse
@@ -481,10 +481,29 @@ func (l *Conn) SearchAsync(searchRequest *SearchRequest) (<-chan *SearchAsyncRes
 					}
 				}
 				response.closed = true
-				responses <- &response
+				ch <- &response
 				return
 			case 19:
-				responses <- &SearchAsyncResponse{Type: SearchAsyncResponseTypeReferral, Referral: packet.Children[1].Children[0].Value.(string)}
+				ch <- &SearchAsyncResponse{Type: SearchAsyncResponseTypeReferral, Referral: packet.Children[1].Children[0].Value.(string)}
+			}
+		}
+	}
+	go func() {
+		defer l.finishMessage(msgCtx)
+		defer close(responses)
+		go rcv()
+		for {
+			select {
+			case <-ctx.Done():
+				ch <- &SearchAsyncResponse{
+					err:    ctx.Err(),
+					closed: true,
+				}
+			case res := <-ch:
+				responses <- res
+				if res.Closed() {
+					return
+				}
 			}
 		}
 	}()

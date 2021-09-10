@@ -1,6 +1,7 @@
 package ldap
 
 import (
+	"context"
 	"crypto/tls"
 	"testing"
 
@@ -90,6 +91,8 @@ func TestSearch(t *testing.T) {
 }
 
 func TestSearchAsync(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	l, err := DialURL(ldapServer)
 	if err != nil {
 		t.Fatal(err)
@@ -104,12 +107,12 @@ func TestSearchAsync(t *testing.T) {
 		nil)
 
 	var entries []*Entry
-	responses, err := l.SearchAsync(searchRequest)
+	responses, err := l.SearchAsync(ctx, searchRequest)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for res := range responses {
-		if res.Err() != nil {
+		if err := res.Err(); err != nil {
 			t.Error(err)
 			break
 		}

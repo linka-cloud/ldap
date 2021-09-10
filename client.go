@@ -1,6 +1,7 @@
 package ldap
 
 import (
+	"context"
 	"crypto/tls"
 	"time"
 )
@@ -28,5 +29,6 @@ type Client interface {
 	PasswordModify(*PasswordModifyRequest) (*PasswordModifyResult, error)
 
 	Search(*SearchRequest) (*SearchResult, error)
+	SearchAsync(ctx context.Context, searchRequest *SearchRequest) (<-chan *SearchAsyncResponse, error)
 	SearchWithPaging(searchRequest *SearchRequest, pagingSize uint32) (*SearchResult, error)
 }
