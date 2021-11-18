@@ -1,6 +1,7 @@
 package ldap
 
 import (
+	"context"
 	"log"
 
 	ber "github.com/go-asn1-ber/asn1-ber"
@@ -76,12 +77,12 @@ func (req *ModifyDNRequest) appendTo(envelope *ber.Packet) error {
 
 // ModifyDN renames the given DN and optionally move to another base (when the "newSup" argument
 // to NewModifyDNRequest() is not "").
-func (l *Conn) ModifyDN(m *ModifyDNRequest) error {
-	msgCtx, err := l.doRequest(m)
+func (l *Conn) ModifyDN(ctx context.Context, m *ModifyDNRequest) error {
+	msgCtx, err := l.doRequest(ctx, m)
 	if err != nil {
 		return err
 	}
-	defer l.finishMessage(msgCtx)
+	defer l.finishMessage(ctx, msgCtx)
 
 	packet, err := l.readPacket(msgCtx)
 	if err != nil {

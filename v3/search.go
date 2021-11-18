@@ -1,6 +1,7 @@
 package ldap
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sort"
@@ -290,7 +291,7 @@ func NewSearchRequest(
 //  - given SearchRequest contains a control of type ControlTypePaging with pagingSize equal to the size requested: no change to the search request
 //  - given SearchRequest contains a control of type ControlTypePaging with pagingSize not equal to the size requested: fail without issuing any queries
 // A requested pagingSize of 0 is interpreted as no limit by LDAP servers.
-func (l *Conn) SearchWithPaging(searchRequest *SearchRequest, pagingSize uint32) (*SearchResult, error) {
+func (l *Conn) SearchWithPaging(ctx context.Context, searchRequest *SearchRequest, pagingSize uint32) (*SearchResult, error) {
 	var pagingControl *ControlPaging
 
 	control := FindControl(searchRequest.Controls, ControlTypePaging)
@@ -310,7 +311,7 @@ func (l *Conn) SearchWithPaging(searchRequest *SearchRequest, pagingSize uint32)
 
 	searchResult := new(SearchResult)
 	for {
-		result, err := l.Search(searchRequest)
+		result, err := l.Search(ctx, searchRequest)
 		l.Debug.Printf("Looking for Paging Control...")
 		if err != nil {
 			return searchResult, err
@@ -349,19 +350,19 @@ func (l *Conn) SearchWithPaging(searchRequest *SearchRequest, pagingSize uint32)
 	if pagingControl != nil {
 		l.Debug.Printf("Abandoning Paging...")
 		pagingControl.PagingSize = 0
-		l.Search(searchRequest)
+		l.Search(ctx, searchRequest)
 	}
 
 	return searchResult, nil
 }
 
 // Search performs the given search request
-func (l *Conn) Search(searchRequest *SearchRequest) (*SearchResult, error) {
-	msgCtx, err := l.doRequest(searchRequest)
+func (l *Conn) Search(ctx context.Context, searchRequest *SearchRequest) (*SearchResult, error) {
+	msgCtx, err := l.doRequest(ctx, searchRequest)
 	if err != nil {
 		return nil, err
 	}
-	defer l.finishMessage(msgCtx)
+	defer l.finishMessage(ctx, msgCtx)
 
 	result := &SearchResult{
 		Entries:   make([]*Entry, 0),

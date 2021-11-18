@@ -1,6 +1,7 @@
 package ldap
 
 import (
+	"context"
 	"log"
 
 	ber "github.com/go-asn1-ber/asn1-ber"
@@ -35,12 +36,12 @@ func NewDelRequest(DN string, Controls []Control) *DelRequest {
 }
 
 // Del executes the given delete request
-func (l *Conn) Del(delRequest *DelRequest) error {
-	msgCtx, err := l.doRequest(delRequest)
+func (l *Conn) Del(ctx context.Context, delRequest *DelRequest) error {
+	msgCtx, err := l.doRequest(ctx, delRequest)
 	if err != nil {
 		return err
 	}
-	defer l.finishMessage(msgCtx)
+	defer l.finishMessage(ctx, msgCtx)
 
 	packet, err := l.readPacket(msgCtx)
 	if err != nil {

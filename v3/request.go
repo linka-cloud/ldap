@@ -1,6 +1,7 @@
 package ldap
 
 import (
+	"context"
 	"errors"
 
 	ber "github.com/go-asn1-ber/asn1-ber"
@@ -22,7 +23,7 @@ func (f requestFunc) appendTo(p *ber.Packet) error {
 	return f(p)
 }
 
-func (l *Conn) doRequest(req request) (*messageContext, error) {
+func (l *Conn) doRequest(ctx context.Context, req request) (*messageContext, error) {
 	if l == nil || l.conn == nil {
 		return nil, ErrNilConnection
 	}
@@ -37,7 +38,7 @@ func (l *Conn) doRequest(req request) (*messageContext, error) {
 		l.Debug.PrintPacket(packet)
 	}
 
-	msgCtx, err := l.sendMessage(packet)
+	msgCtx, err := l.sendMessage(ctx, packet)
 	if err != nil {
 		return nil, err
 	}
@@ -47,25 +48,29 @@ func (l *Conn) doRequest(req request) (*messageContext, error) {
 
 func (l *Conn) readPacket(msgCtx *messageContext) (*ber.Packet, error) {
 	l.Debug.Printf("%d: waiting for response", msgCtx.id)
-	packetResponse, ok := <-msgCtx.responses
-	if !ok {
-		return nil, NewError(ErrorNetwork, errRespChanClosed)
-	}
-	packet, err := packetResponse.ReadPacket()
-	l.Debug.Printf("%d: got response %p", msgCtx.id, packet)
-	if err != nil {
-		return nil, err
-	}
-
-	if packet == nil {
-		return nil, NewError(ErrorNetwork, errCouldNotRetMsg)
-	}
-
-	if l.Debug {
-		if err = addLDAPDescriptions(packet); err != nil {
+	select {
+	case packetResponse, ok := <-msgCtx.responses:
+		if !ok {
+			return nil, NewError(ErrorNetwork, errRespChanClosed)
+		}
+		packet, err := packetResponse.ReadPacket()
+		l.Debug.Printf("%d: got response %p", msgCtx.id, packet)
+		if err != nil {
 			return nil, err
 		}
-		l.Debug.PrintPacket(packet)
+
+		if packet == nil {
+			return nil, NewError(ErrorNetwork, errCouldNotRetMsg)
+		}
+
+		if l.Debug {
+			if err = addLDAPDescriptions(packet); err != nil {
+				return nil, err
+			}
+			l.Debug.PrintPacket(packet)
+		}
+		return packet, nil
+	case <-msgCtx.ctx.Done():
+		return nil, msgCtx.ctx.Err()
 	}
-	return packet, nil
 }

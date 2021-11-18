@@ -1,6 +1,7 @@
 package ldap
 
 import (
+	"context"
 	"errors"
 	"log"
 
@@ -109,12 +110,12 @@ func NewModifyRequest(dn string, controls []Control) *ModifyRequest {
 }
 
 // Modify performs the ModifyRequest
-func (l *Conn) Modify(modifyRequest *ModifyRequest) error {
-	msgCtx, err := l.doRequest(modifyRequest)
+func (l *Conn) Modify(ctx context.Context, modifyRequest *ModifyRequest) error {
+	msgCtx, err := l.doRequest(ctx, modifyRequest)
 	if err != nil {
 		return err
 	}
-	defer l.finishMessage(msgCtx)
+	defer l.finishMessage(ctx, msgCtx)
 
 	packet, err := l.readPacket(msgCtx)
 	if err != nil {
@@ -139,12 +140,12 @@ type ModifyResult struct {
 }
 
 // ModifyWithResult performs the ModifyRequest and returns the result
-func (l *Conn) ModifyWithResult(modifyRequest *ModifyRequest) (*ModifyResult, error) {
-	msgCtx, err := l.doRequest(modifyRequest)
+func (l *Conn) ModifyWithResult(ctx context.Context, modifyRequest *ModifyRequest) (*ModifyResult, error) {
+	msgCtx, err := l.doRequest(ctx, modifyRequest)
 	if err != nil {
 		return nil, err
 	}
-	defer l.finishMessage(msgCtx)
+	defer l.finishMessage(ctx, msgCtx)
 
 	result := &ModifyResult{
 		Controls: make([]Control, 0),

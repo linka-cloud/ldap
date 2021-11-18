@@ -2,6 +2,7 @@ package ldap
 
 import (
 	"bufio"
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -52,7 +53,8 @@ func (pr *PacketResponse) ReadPacket() (*ber.Packet, error) {
 }
 
 type messageContext struct {
-	id int64
+	ctx context.Context
+	id  int64
 	// close(done) should only be called from finishMessage()
 	done chan struct{}
 	// close(responses) should only be called from processMessages(), and only sent to from sendResponse()
@@ -145,12 +147,12 @@ type DialContext struct {
 	tc *tls.Config
 }
 
-func (dc *DialContext) dial(u *url.URL) (net.Conn, error) {
+func (dc *DialContext) dial(ctx context.Context, u *url.URL) (net.Conn, error) {
 	if u.Scheme == "ldapi" {
 		if u.Path == "" || u.Path == "/" {
 			u.Path = "/var/run/slapd/ldapi"
 		}
-		return dc.d.Dial("unix", u.Path)
+		return dc.d.DialContext(ctx, "unix", u.Path)
 	}
 
 	host, port, err := net.SplitHostPort(u.Host)
@@ -165,11 +167,12 @@ func (dc *DialContext) dial(u *url.URL) (net.Conn, error) {
 		if port == "" {
 			port = DefaultLdapPort
 		}
-		return dc.d.Dial("tcp", net.JoinHostPort(host, port))
+		return dc.d.DialContext(ctx, "tcp", net.JoinHostPort(host, port))
 	case "ldaps":
 		if port == "" {
 			port = DefaultLdapsPort
 		}
+		// TODO(adphi): context support ?
 		return tls.DialWithDialer(dc.d, "tcp", net.JoinHostPort(host, port), dc.tc)
 	}
 
@@ -179,33 +182,33 @@ func (dc *DialContext) dial(u *url.URL) (net.Conn, error) {
 // Dial connects to the given address on the given network using net.Dial
 // and then returns a new Conn for the connection.
 // @deprecated Use DialURL instead.
-func Dial(network, addr string) (*Conn, error) {
+func Dial(ctx context.Context, network, addr string) (*Conn, error) {
 	c, err := net.DialTimeout(network, addr, DefaultTimeout)
 	if err != nil {
 		return nil, NewError(ErrorNetwork, err)
 	}
-	conn := NewConn(c, false)
-	conn.Start()
+	conn := NewConn(ctx, c, false)
+	conn.Start(ctx)
 	return conn, nil
 }
 
 // DialTLS connects to the given address on the given network using tls.Dial
 // and then returns a new Conn for the connection.
 // @deprecated Use DialURL instead.
-func DialTLS(network, addr string, config *tls.Config) (*Conn, error) {
+func DialTLS(ctx context.Context, network, addr string, config *tls.Config) (*Conn, error) {
 	c, err := tls.DialWithDialer(&net.Dialer{Timeout: DefaultTimeout}, network, addr, config)
 	if err != nil {
 		return nil, NewError(ErrorNetwork, err)
 	}
-	conn := NewConn(c, true)
-	conn.Start()
+	conn := NewConn(ctx, c, true)
+	conn.Start(ctx)
 	return conn, nil
 }
 
 // DialURL connects to the given ldap URL.
 // The following schemas are supported: ldap://, ldaps://, ldapi://.
 // On success a new Conn for the connection is returned.
-func DialURL(addr string, opts ...DialOpt) (*Conn, error) {
+func DialURL(ctx context.Context, addr string, opts ...DialOpt) (*Conn, error) {
 	u, err := url.Parse(addr)
 	if err != nil {
 		return nil, NewError(ErrorNetwork, err)
@@ -219,18 +222,18 @@ func DialURL(addr string, opts ...DialOpt) (*Conn, error) {
 		dc.d = &net.Dialer{Timeout: DefaultTimeout}
 	}
 
-	c, err := dc.dial(u)
+	c, err := dc.dial(ctx, u)
 	if err != nil {
 		return nil, NewError(ErrorNetwork, err)
 	}
 
-	conn := NewConn(c, u.Scheme == "ldaps")
-	conn.Start()
+	conn := NewConn(ctx, c, u.Scheme == "ldaps")
+	conn.Start(ctx)
 	return conn, nil
 }
 
 // NewConn returns a new Conn using conn for network I/O.
-func NewConn(conn net.Conn, isTLS bool) *Conn {
+func NewConn(ctx context.Context, conn net.Conn, isTLS bool) *Conn {
 	return &Conn{
 		conn:            conn,
 		chanConfirm:     make(chan struct{}),
@@ -243,10 +246,14 @@ func NewConn(conn net.Conn, isTLS bool) *Conn {
 }
 
 // Start initializes goroutines to read responses and process messages
-func (l *Conn) Start() {
+func (l *Conn) Start(ctx context.Context) {
 	l.wgClose.Add(1)
-	go l.reader()
-	go l.processMessages()
+	go func() {
+		<-ctx.Done()
+		l.Close()
+	}()
+	go l.reader(ctx)
+	go l.processMessages(ctx)
 }
 
 // IsClosing returns whether or not we're currently closing.
@@ -296,7 +303,7 @@ func (l *Conn) nextMessageID() int64 {
 }
 
 // StartTLS sends the command to start a TLS session and then creates a new TLS Client
-func (l *Conn) StartTLS(config *tls.Config) error {
+func (l *Conn) StartTLS(ctx context.Context, config *tls.Config) error {
 	if l.isTLS {
 		return NewError(ErrorNetwork, errors.New("ldap: already encrypted"))
 	}
@@ -308,11 +315,11 @@ func (l *Conn) StartTLS(config *tls.Config) error {
 	packet.AppendChild(request)
 	l.Debug.PrintPacket(packet)
 
-	msgCtx, err := l.sendMessageWithFlags(packet, startTLS)
+	msgCtx, err := l.sendMessageWithFlags(ctx, packet, startTLS)
 	if err != nil {
 		return err
 	}
-	defer l.finishMessage(msgCtx)
+	defer l.finishMessage(ctx, msgCtx)
 
 	l.Debug.Printf("%d: waiting for response", msgCtx.id)
 
@@ -347,7 +354,7 @@ func (l *Conn) StartTLS(config *tls.Config) error {
 	} else {
 		return err
 	}
-	go l.reader()
+	go l.reader(ctx)
 
 	return nil
 }
@@ -363,13 +370,16 @@ func (l *Conn) TLSConnectionState() (state tls.ConnectionState, ok bool) {
 	return tc.ConnectionState(), true
 }
 
-func (l *Conn) sendMessage(packet *ber.Packet) (*messageContext, error) {
-	return l.sendMessageWithFlags(packet, 0)
+func (l *Conn) sendMessage(ctx context.Context, packet *ber.Packet) (*messageContext, error) {
+	return l.sendMessageWithFlags(ctx, packet, 0)
 }
 
-func (l *Conn) sendMessageWithFlags(packet *ber.Packet, flags sendMessageFlags) (*messageContext, error) {
+func (l *Conn) sendMessageWithFlags(ctx context.Context, packet *ber.Packet, flags sendMessageFlags) (*messageContext, error) {
 	if l.IsClosing() {
 		return nil, NewError(ErrorNetwork, errors.New("ldap: connection closed"))
+	}
+	if ctx == nil {
+		ctx = context.Background()
 	}
 	l.messageMutex.Lock()
 	l.Debug.Printf("flags&startTLS = %d", flags&startTLS)
@@ -395,12 +405,16 @@ func (l *Conn) sendMessageWithFlags(packet *ber.Packet, flags sendMessageFlags) 
 		MessageID: messageID,
 		Packet:    packet,
 		Context: &messageContext{
+			ctx:       ctx,
 			id:        messageID,
 			done:      make(chan struct{}),
 			responses: responses,
 		},
 	}
 	if !l.sendProcessMessage(message) {
+		if err := message.Context.ctx.Err(); err != nil {
+			return nil, err
+		}
 		if l.IsClosing() {
 			return nil, NewError(ErrorNetwork, errors.New("ldap: connection closed"))
 		}
@@ -409,7 +423,7 @@ func (l *Conn) sendMessageWithFlags(packet *ber.Packet, flags sendMessageFlags) 
 	return message.Context, nil
 }
 
-func (l *Conn) finishMessage(msgCtx *messageContext) {
+func (l *Conn) finishMessage(ctx context.Context, msgCtx *messageContext) {
 	close(msgCtx.done)
 
 	if l.IsClosing() {
@@ -424,6 +438,7 @@ func (l *Conn) finishMessage(msgCtx *messageContext) {
 	l.messageMutex.Unlock()
 
 	message := &messagePacket{
+		Context:   &messageContext{ctx: ctx},
 		Op:        MessageFinish,
 		MessageID: msgCtx.id,
 	}
@@ -436,11 +451,15 @@ func (l *Conn) sendProcessMessage(message *messagePacket) bool {
 	if l.IsClosing() {
 		return false
 	}
-	l.chanMessage <- message
-	return true
+	select {
+	case <-message.Context.ctx.Done():
+		return false
+	case l.chanMessage <- message:
+		return true
+	}
 }
 
-func (l *Conn) processMessages() {
+func (l *Conn) processMessages(ctx context.Context) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Printf("ldap: recovered panic in processMessages: %v", err)
@@ -462,6 +481,9 @@ func (l *Conn) processMessages() {
 	var messageID int64 = 1
 	for {
 		select {
+		case <-ctx.Done():
+			l.Close()
+			return
 		case l.chanMessageID <- messageID:
 			messageID++
 		case message := <-l.chanMessage:
@@ -488,6 +510,9 @@ func (l *Conn) processMessages() {
 
 				// Add timeout if defined
 				requestTimeout := time.Duration(atomic.LoadInt64(&l.requestTimeout))
+				if d, ok := message.Context.ctx.Deadline(); ok {
+					requestTimeout = d.Sub(time.Now())
+				}
 				if requestTimeout > 0 {
 					go func() {
 						defer func() {
@@ -497,6 +522,7 @@ func (l *Conn) processMessages() {
 						}()
 						time.Sleep(requestTimeout)
 						timeoutMessage := &messagePacket{
+							Context:   &messageContext{ctx: ctx},
 							Op:        MessageTimeout,
 							MessageID: message.MessageID,
 						}
@@ -531,7 +557,7 @@ func (l *Conn) processMessages() {
 	}
 }
 
-func (l *Conn) reader() {
+func (l *Conn) reader(ctx context.Context) {
 	cleanstop := false
 	defer func() {
 		if err := recover(); err != nil {
@@ -546,6 +572,9 @@ func (l *Conn) reader() {
 	for {
 		if cleanstop {
 			l.Debug.Printf("reader clean stopping (without closing the connection)")
+			return
+		}
+		if err := ctx.Err(); err != nil {
 			return
 		}
 		packet, err := ber.ReadPacket(bufConn)
@@ -570,6 +599,7 @@ func (l *Conn) reader() {
 		}
 		l.messageMutex.Unlock()
 		message := &messagePacket{
+			Context:   &messageContext{ctx: ctx},
 			Op:        MessageResponse,
 			MessageID: packet.Children[0].Value.(int64),
 			Packet:    packet,

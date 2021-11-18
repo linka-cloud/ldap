@@ -1,6 +1,7 @@
 package ldap
 
 import (
+	"context"
 	"fmt"
 
 	ber "github.com/go-asn1-ber/asn1-ber"
@@ -30,15 +31,15 @@ func (req *CompareRequest) appendTo(envelope *ber.Packet) error {
 
 // Compare checks to see if the attribute of the dn matches value. Returns true if it does otherwise
 // false with any error that occurs if any.
-func (l *Conn) Compare(dn, attribute, value string) (bool, error) {
-	msgCtx, err := l.doRequest(&CompareRequest{
+func (l *Conn) Compare(ctx context.Context, dn, attribute, value string) (bool, error) {
+	msgCtx, err := l.doRequest(ctx, &CompareRequest{
 		DN:        dn,
 		Attribute: attribute,
 		Value:     value})
 	if err != nil {
 		return false, err
 	}
-	defer l.finishMessage(msgCtx)
+	defer l.finishMessage(ctx, msgCtx)
 
 	packet, err := l.readPacket(msgCtx)
 	if err != nil {

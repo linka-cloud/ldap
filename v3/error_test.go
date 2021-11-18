@@ -1,6 +1,7 @@
 package ldap
 
 import (
+	"context"
 	"errors"
 	"net"
 	"strings"
@@ -34,12 +35,14 @@ func TestNilPacket(t *testing.T) {
 // TestConnReadErr tests that an unexpected error reading from underlying
 // connection bubbles up to the goroutine which makes a request.
 func TestConnReadErr(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	conn := &signalErrConn{
 		signals: make(chan error),
 	}
 
-	ldapConn := NewConn(conn, false)
-	ldapConn.Start()
+	ldapConn := NewConn(ctx, conn, false)
+	ldapConn.Start(ctx)
 
 	// Make a dummy search request.
 	searchReq := NewSearchRequest("dc=example,dc=com", ScopeWholeSubtree, DerefAlways, 0, 0, false, "(objectClass=*)", nil, nil)
@@ -52,7 +55,7 @@ func TestConnReadErr(t *testing.T) {
 	// This should block until the underlying conn gets the error signal
 	// which should bubble up through the reader() goroutine, close the
 	// connection, and
-	_, err := ldapConn.Search(searchReq)
+	_, err := ldapConn.Search(ctx, searchReq)
 	if err == nil || !strings.Contains(err.Error(), expectedError.Error()) {
 		t.Errorf("not the expected error: %s", err)
 	}

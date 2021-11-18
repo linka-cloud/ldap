@@ -2,6 +2,7 @@ package ldap
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"net"
@@ -16,6 +17,8 @@ import (
 )
 
 func TestUnresponsiveConnection(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	// The do-nothing server that accepts requests and does nothing
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	}))
@@ -26,9 +29,9 @@ func TestUnresponsiveConnection(t *testing.T) {
 	}
 
 	// Create an Ldap connection
-	conn := NewConn(c, false)
+	conn := NewConn(ctx, c, false)
 	conn.SetTimeout(time.Millisecond)
-	conn.Start()
+	conn.Start(ctx)
 	defer conn.Close()
 
 	// Mock a packet
@@ -39,11 +42,11 @@ func TestUnresponsiveConnection(t *testing.T) {
 	packet.AppendChild(bindRequest)
 
 	// Send packet and test response
-	msgCtx, err := conn.sendMessage(packet)
+	msgCtx, err := conn.sendMessage(ctx, packet)
 	if err != nil {
 		t.Fatalf("error sending message: %v", err)
 	}
-	defer conn.finishMessage(msgCtx)
+	defer conn.finishMessage(ctx, msgCtx)
 
 	packetResponse, ok := <-msgCtx.responses
 	if !ok {
@@ -61,11 +64,13 @@ func TestUnresponsiveConnection(t *testing.T) {
 // TestFinishMessage tests that we do not enter deadlock when a goroutine makes
 // a request but does not handle all responses from the server.
 func TestFinishMessage(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	ptc := newPacketTranslatorConn()
 	defer ptc.Close()
 
-	conn := NewConn(ptc, false)
-	conn.Start()
+	conn := NewConn(ctx, ptc, false)
+	conn.Start(ctx)
 
 	// Test sending 5 different requests in series. Ensure that we can
 	// get a response packet from the underlying connection and also
@@ -73,11 +78,11 @@ func TestFinishMessage(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		t.Logf("serial request %d", i)
 		// Create a message and make sure we can receive responses.
-		msgCtx := testSendRequest(t, ptc, conn)
+		msgCtx := testSendRequest(t, ctx, ptc, conn)
 		testReceiveResponse(t, ptc, msgCtx)
 
 		// Send a few unhandled responses and finish the message.
-		testSendUnhandledResponsesAndFinish(t, ptc, conn, msgCtx, 5)
+		testSendUnhandledResponsesAndFinish(t, ctx, ptc, conn, msgCtx, 5)
 		t.Logf("serial request %d done", i)
 	}
 
@@ -89,11 +94,11 @@ func TestFinishMessage(t *testing.T) {
 			defer wg.Done()
 			t.Logf("parallel request %d", i)
 			// Create a message and make sure we can receive responses.
-			msgCtx := testSendRequest(t, ptc, conn)
+			msgCtx := testSendRequest(t, ctx, ptc, conn)
 			testReceiveResponse(t, ptc, msgCtx)
 
 			// Send a few unhandled responses and finish the message.
-			testSendUnhandledResponsesAndFinish(t, ptc, conn, msgCtx, 5)
+			testSendUnhandledResponsesAndFinish(t, ctx, ptc, conn, msgCtx, 5)
 			t.Logf("parallel request %d done", i)
 		}(i)
 	}
@@ -106,14 +111,16 @@ func TestFinishMessage(t *testing.T) {
 
 // See: https://github.com/go-ldap/ldap/issues/332
 func TestNilConnection(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	var conn *Conn
-	_, err := conn.Search(&SearchRequest{})
+	_, err := conn.Search(ctx, &SearchRequest{})
 	if err != ErrNilConnection {
 		t.Fatalf("expected error to be ErrNilConnection, got %v", err)
 	}
 }
 
-func testSendRequest(t *testing.T, ptc *packetTranslatorConn, conn *Conn) (msgCtx *messageContext) {
+func testSendRequest(t *testing.T, ctx context.Context, ptc *packetTranslatorConn, conn *Conn) (msgCtx *messageContext) {
 	var msgID int64
 	runWithTimeout(t, time.Second, func() {
 		msgID = conn.nextMessageID()
@@ -125,7 +132,7 @@ func testSendRequest(t *testing.T, ptc *packetTranslatorConn, conn *Conn) (msgCt
 	var err error
 
 	runWithTimeout(t, time.Second, func() {
-		msgCtx, err = conn.sendMessage(requestPacket)
+		msgCtx, err = conn.sendMessage(ctx, requestPacket)
 		if err != nil {
 			t.Fatalf("unable to send request message: %s", err)
 		}
@@ -161,7 +168,7 @@ func testReceiveResponse(t *testing.T, ptc *packetTranslatorConn, msgCtx *messag
 	})
 }
 
-func testSendUnhandledResponsesAndFinish(t *testing.T, ptc *packetTranslatorConn, conn *Conn, msgCtx *messageContext, numResponses int) {
+func testSendUnhandledResponsesAndFinish(t *testing.T, ctx context.Context, ptc *packetTranslatorConn, conn *Conn, msgCtx *messageContext, numResponses int) {
 	// Send a mock response packet.
 	responsePacket := ber.Encode(ber.ClassUniversal, ber.TypeConstructed, ber.TagSequence, nil, "LDAP Response")
 	responsePacket.AppendChild(ber.NewInteger(ber.ClassUniversal, ber.TypePrimitive, ber.TagInteger, msgCtx.id, "MessageID"))
@@ -178,7 +185,7 @@ func testSendUnhandledResponsesAndFinish(t *testing.T, ptc *packetTranslatorConn
 
 	// Finally, attempt to finish this message.
 	runWithTimeout(t, time.Second, func() {
-		conn.finishMessage(msgCtx)
+		conn.finishMessage(ctx, msgCtx)
 	})
 }
 

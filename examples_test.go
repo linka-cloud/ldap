@@ -1,6 +1,7 @@
 package ldap
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -11,13 +12,15 @@ import (
 // This example demonstrates how to bind a connection to an ldap user
 // allowing access to restricted attributes that user has access to
 func ExampleConn_Bind() {
-	l, err := DialURL("ldap://ldap.example.com:389")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	l, err := DialURL(ctx, "ldap://ldap.example.com:389")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer l.Close()
 
-	err = l.Bind("cn=read-only-admin,dc=example,dc=com", "password")
+	err = l.Bind(ctx, "cn=read-only-admin,dc=example,dc=com", "password")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -25,7 +28,9 @@ func ExampleConn_Bind() {
 
 // This example demonstrates how to use the search interface
 func ExampleConn_Search() {
-	l, err := DialURL("ldap://ldap.example.com:389")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	l, err := DialURL(ctx, "ldap://ldap.example.com:389")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -39,7 +44,7 @@ func ExampleConn_Search() {
 		nil,
 	)
 
-	sr, err := l.Search(searchRequest)
+	sr, err := l.Search(ctx, searchRequest)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -51,14 +56,16 @@ func ExampleConn_Search() {
 
 // This example demonstrates how to start a TLS connection
 func ExampleConn_StartTLS() {
-	l, err := DialURL("ldap://ldap.example.com:389")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	l, err := DialURL(ctx, "ldap://ldap.example.com:389")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer l.Close()
 
 	// Reconnect with TLS
-	err = l.StartTLS(&tls.Config{InsecureSkipVerify: true})
+	err = l.StartTLS(ctx, &tls.Config{InsecureSkipVerify: true})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -68,13 +75,15 @@ func ExampleConn_StartTLS() {
 
 // This example demonstrates how to compare an attribute with a value
 func ExampleConn_Compare() {
-	l, err := DialURL("ldap://ldap.example.com:389")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	l, err := DialURL(ctx, "ldap://ldap.example.com:389")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer l.Close()
 
-	matched, err := l.Compare("cn=user,dc=example,dc=com", "uid", "someuserid")
+	matched, err := l.Compare(ctx, "cn=user,dc=example,dc=com", "uid", "someuserid")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -83,19 +92,21 @@ func ExampleConn_Compare() {
 }
 
 func ExampleConn_PasswordModify_admin() {
-	l, err := DialURL("ldap://ldap.example.com:389")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	l, err := DialURL(ctx, "ldap://ldap.example.com:389")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer l.Close()
 
-	err = l.Bind("cn=admin,dc=example,dc=com", "password")
+	err = l.Bind(ctx, "cn=admin,dc=example,dc=com", "password")
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	passwordModifyRequest := NewPasswordModifyRequest("cn=user,dc=example,dc=com", "", "NewPassword")
-	_, err = l.PasswordModify(passwordModifyRequest)
+	_, err = l.PasswordModify(ctx, passwordModifyRequest)
 
 	if err != nil {
 		log.Fatalf("Password could not be changed: %s", err.Error())
@@ -103,19 +114,21 @@ func ExampleConn_PasswordModify_admin() {
 }
 
 func ExampleConn_PasswordModify_generatedPassword() {
-	l, err := DialURL("ldap://ldap.example.com:389")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	l, err := DialURL(ctx, "ldap://ldap.example.com:389")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer l.Close()
 
-	err = l.Bind("cn=user,dc=example,dc=com", "password")
+	err = l.Bind(ctx, "cn=user,dc=example,dc=com", "password")
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	passwordModifyRequest := NewPasswordModifyRequest("", "OldPassword", "")
-	passwordModifyResponse, err := l.PasswordModify(passwordModifyRequest)
+	passwordModifyResponse, err := l.PasswordModify(ctx, passwordModifyRequest)
 	if err != nil {
 		log.Fatalf("Password could not be changed: %s", err.Error())
 	}
@@ -125,19 +138,21 @@ func ExampleConn_PasswordModify_generatedPassword() {
 }
 
 func ExampleConn_PasswordModify_setNewPassword() {
-	l, err := DialURL("ldap://ldap.example.com:389")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	l, err := DialURL(ctx, "ldap://ldap.example.com:389")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer l.Close()
 
-	err = l.Bind("cn=user,dc=example,dc=com", "password")
+	err = l.Bind(ctx, "cn=user,dc=example,dc=com", "password")
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	passwordModifyRequest := NewPasswordModifyRequest("", "OldPassword", "NewPassword")
-	_, err = l.PasswordModify(passwordModifyRequest)
+	_, err = l.PasswordModify(ctx, passwordModifyRequest)
 
 	if err != nil {
 		log.Fatalf("Password could not be changed: %s", err.Error())
@@ -145,7 +160,9 @@ func ExampleConn_PasswordModify_setNewPassword() {
 }
 
 func ExampleConn_Modify() {
-	l, err := DialURL("ldap://ldap.example.com:389")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	l, err := DialURL(ctx, "ldap://ldap.example.com:389")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -156,7 +173,7 @@ func ExampleConn_Modify() {
 	modify.Add("description", []string{"An example user"})
 	modify.Replace("mail", []string{"user@example.org"})
 
-	err = l.Modify(modify)
+	err = l.Modify(ctx, modify)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -165,6 +182,8 @@ func ExampleConn_Modify() {
 // Example_userAuthentication shows how a typical application can verify a login attempt
 // Refer to https://github.com/go-ldap/ldap/issues/93 for issues revolving around unauthenticated binds, with zero length passwords
 func Example_userAuthentication() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	// The username and password we want to check
 	username := "someuser"
 	password := "userpassword"
@@ -172,20 +191,20 @@ func Example_userAuthentication() {
 	bindusername := "readonly"
 	bindpassword := "password"
 
-	l, err := DialURL("ldap://ldap.example.com:389")
+	l, err := DialURL(ctx, "ldap://ldap.example.com:389")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer l.Close()
 
 	// Reconnect with TLS
-	err = l.StartTLS(&tls.Config{InsecureSkipVerify: true})
+	err = l.StartTLS(ctx, &tls.Config{InsecureSkipVerify: true})
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// First bind with a read only user
-	err = l.Bind(bindusername, bindpassword)
+	err = l.Bind(ctx, bindusername, bindpassword)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -199,7 +218,7 @@ func Example_userAuthentication() {
 		nil,
 	)
 
-	sr, err := l.Search(searchRequest)
+	sr, err := l.Search(ctx, searchRequest)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -211,20 +230,22 @@ func Example_userAuthentication() {
 	userdn := sr.Entries[0].DN
 
 	// Bind as the user to verify their password
-	err = l.Bind(userdn, password)
+	err = l.Bind(ctx, userdn, password)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Rebind as the read only user for any further queries
-	err = l.Bind(bindusername, bindpassword)
+	err = l.Bind(ctx, bindusername, bindpassword)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
 func Example_beherappolicy() {
-	l, err := DialURL("ldap://ldap.example.com:389")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	l, err := DialURL(ctx, "ldap://ldap.example.com:389")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -234,7 +255,7 @@ func Example_beherappolicy() {
 	controls = append(controls, NewControlBeheraPasswordPolicy())
 	bindRequest := NewSimpleBindRequest("cn=admin,dc=example,dc=com", "password", controls)
 
-	r, err := l.SimpleBind(bindRequest)
+	r, err := l.SimpleBind(ctx, bindRequest)
 	ppolicyControl := FindControl(r.Controls, ControlTypeBeheraPasswordPolicy)
 
 	var ppolicy *ControlBeheraPasswordPolicy
@@ -263,7 +284,9 @@ func Example_beherappolicy() {
 }
 
 func Example_vchuppolicy() {
-	l, err := DialURL("ldap://ldap.example.com:389")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	l, err := DialURL(ctx, "ldap://ldap.example.com:389")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -272,7 +295,7 @@ func Example_vchuppolicy() {
 
 	bindRequest := NewSimpleBindRequest("cn=admin,dc=example,dc=com", "password", nil)
 
-	r, err := l.SimpleBind(bindRequest)
+	r, err := l.SimpleBind(ctx, bindRequest)
 
 	passwordMustChangeControl := FindControl(r.Controls, ControlTypeVChuPasswordMustChange)
 	var passwordMustChange *ControlVChuPasswordMustChange
@@ -308,7 +331,9 @@ func Example_vchuppolicy() {
 // This example demonstrates how to use ControlPaging to manually execute a
 // paginated search request instead of using SearchWithPaging.
 func ExampleControlPaging_manualPaging() {
-	conn, err := DialURL("ldap://ldap.example.com:389")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	conn, err := DialURL(ctx, "ldap://ldap.example.com:389")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -323,7 +348,7 @@ func ExampleControlPaging_manualPaging() {
 
 	for {
 		request := NewSearchRequest(searchBase, ScopeWholeSubtree, DerefAlways, 0, 0, false, filter, attributes, controls)
-		response, err := conn.Search(request)
+		response, err := conn.Search(ctx, request)
 		if err != nil {
 			log.Fatalf("Failed to execute search request: %s", err.Error())
 		}
@@ -346,6 +371,8 @@ func ExampleControlPaging_manualPaging() {
 
 // This example demonstrates how to use EXTERNAL SASL with TLS client certificates.
 func ExampleConn_ExternalBind() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	var ldapCert = "/path/to/cert.pem"
 	var ldapKey = "/path/to/key.pem"
 	var ldapCAchain = "/path/to/ca_chain.pem"
@@ -372,20 +399,20 @@ func ExampleConn_ExternalBind() {
 	}
 
 	// connect to ldap server
-	l, err := DialURL("ldap://ldap.example.com:389")
+	l, err := DialURL(ctx, "ldap://ldap.example.com:389")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer l.Close()
 
 	// reconnect using tls
-	err = l.StartTLS(tlsConfig)
+	err = l.StartTLS(ctx, tlsConfig)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// sasl external bind
-	err = l.ExternalBind()
+	err = l.ExternalBind(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -395,12 +422,14 @@ func ExampleConn_ExternalBind() {
 
 // ExampleConn_WhoAmI demonstrates how to run a whoami request according to https://tools.ietf.org/html/rfc4532
 func ExampleConn_WhoAmI() {
-	conn, err := DialURL("ldap.example.org:389")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	conn, err := DialURL(ctx, "ldap.example.org:389")
 	if err != nil {
 		log.Fatalf("Failed to connect: %s\n", err)
 	}
 
-	_, err = conn.SimpleBind(&SimpleBindRequest{
+	_, err = conn.SimpleBind(ctx, &SimpleBindRequest{
 		Username: "uid=someone,ou=people,dc=example,dc=org",
 		Password: "MySecretPass",
 	})
@@ -408,7 +437,7 @@ func ExampleConn_WhoAmI() {
 		log.Fatalf("Failed to bind: %s\n", err)
 	}
 
-	res, err := conn.WhoAmI(nil)
+	res, err := conn.WhoAmI(ctx, nil)
 	if err != nil {
 		log.Fatalf("Failed to call WhoAmI(): %s\n", err)
 	}

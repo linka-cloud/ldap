@@ -1,6 +1,7 @@
 package ldap
 
 import (
+	"context"
 	"errors"
 
 	ber "github.com/go-asn1-ber/asn1-ber"
@@ -18,12 +19,12 @@ func (unbindRequest) appendTo(envelope *ber.Packet) error {
 // Unbind will perform an unbind request. The Unbind operation
 // should be thought of as the "quit" operation.
 // See https://datatracker.ietf.org/doc/html/rfc4511#section-4.3
-func (l *Conn) Unbind() error {
+func (l *Conn) Unbind(ctx context.Context, ) error {
 	if l.IsClosing() {
 		return ErrConnUnbound
 	}
 
-	_, err := l.doRequest(unbindRequest{})
+	_, err := l.doRequest(ctx, unbindRequest{})
 	if err != nil {
 		return err
 	}

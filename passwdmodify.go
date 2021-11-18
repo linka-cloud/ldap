@@ -1,6 +1,7 @@
 package ldap
 
 import (
+	"context"
 	"fmt"
 
 	ber "github.com/go-asn1-ber/asn1-ber"
@@ -80,12 +81,12 @@ func NewPasswordModifyRequest(userIdentity string, oldPassword string, newPasswo
 }
 
 // PasswordModify performs the modification request
-func (l *Conn) PasswordModify(passwordModifyRequest *PasswordModifyRequest) (*PasswordModifyResult, error) {
-	msgCtx, err := l.doRequest(passwordModifyRequest)
+func (l *Conn) PasswordModify(ctx context.Context, passwordModifyRequest *PasswordModifyRequest) (*PasswordModifyResult, error) {
+	msgCtx, err := l.doRequest(ctx, passwordModifyRequest)
 	if err != nil {
 		return nil, err
 	}
-	defer l.finishMessage(msgCtx)
+	defer l.finishMessage(ctx, msgCtx)
 
 	packet, err := l.readPacket(msgCtx)
 	if err != nil {

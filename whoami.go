@@ -5,6 +5,7 @@ package ldap
 // https://tools.ietf.org/html/rfc4532
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -26,7 +27,7 @@ func (r whoAmIRequest) encode() (*ber.Packet, error) {
 
 // WhoAmI returns the authzId the server thinks we are, you may pass controls
 // like a Proxied Authorization control
-func (l *Conn) WhoAmI(controls []Control) (*WhoAmIResult, error) {
+func (l *Conn) WhoAmI(ctx context.Context, controls []Control) (*WhoAmIResult, error) {
 	packet := ber.Encode(ber.ClassUniversal, ber.TypeConstructed, ber.TagSequence, nil, "LDAP Request")
 	packet.AppendChild(ber.NewInteger(ber.ClassUniversal, ber.TypePrimitive, ber.TagInteger, l.nextMessageID(), "MessageID"))
 	req := whoAmIRequest(true)
@@ -42,11 +43,11 @@ func (l *Conn) WhoAmI(controls []Control) (*WhoAmIResult, error) {
 
 	l.Debug.PrintPacket(packet)
 
-	msgCtx, err := l.sendMessage(packet)
+	msgCtx, err := l.sendMessage(ctx, packet)
 	if err != nil {
 		return nil, err
 	}
-	defer l.finishMessage(msgCtx)
+	defer l.finishMessage(ctx, msgCtx)
 
 	result := &WhoAmIResult{}
 

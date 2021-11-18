@@ -1,8 +1,12 @@
 package ldap
 
 import (
+	"context"
 	"crypto/tls"
+	"errors"
+	"strings"
 	"testing"
+	"time"
 
 	ber "github.com/go-asn1-ber/asn1-ber"
 )
@@ -21,15 +25,28 @@ var attributes = []string{
 	"description"}
 
 func TestUnsecureDialURL(t *testing.T) {
-	l, err := DialURL(ldapServer)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	l, err := DialURL(ctx, ldapServer)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer l.Close()
 }
 
+func TestDialURLCanceled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := DialURL(ctx, ldapServer)
+	if err == nil || !strings.Contains(err.Error(), "canceled") {
+		t.Fatal("expected context canceled error")
+	}
+}
+
 func TestSecureDialURL(t *testing.T) {
-	l, err := DialURL(ldapsServer, DialWithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	l, err := DialURL(ctx, ldapsServer, DialWithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,24 +54,28 @@ func TestSecureDialURL(t *testing.T) {
 }
 
 func TestStartTLS(t *testing.T) {
-	l, err := DialURL(ldapServer)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	l, err := DialURL(ctx, ldapServer)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer l.Close()
-	err = l.StartTLS(&tls.Config{InsecureSkipVerify: true})
+	err = l.StartTLS(ctx, &tls.Config{InsecureSkipVerify: true})
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestTLSConnectionState(t *testing.T) {
-	l, err := DialURL(ldapServer)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	l, err := DialURL(ctx, ldapServer)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer l.Close()
-	err = l.StartTLS(&tls.Config{InsecureSkipVerify: true})
+	err = l.StartTLS(ctx, &tls.Config{InsecureSkipVerify: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +90,9 @@ func TestTLSConnectionState(t *testing.T) {
 }
 
 func TestSearch(t *testing.T) {
-	l, err := DialURL(ldapServer)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	l, err := DialURL(ctx, ldapServer)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,15 +105,17 @@ func TestSearch(t *testing.T) {
 		attributes,
 		nil)
 
-	sr, err := l.Search(searchRequest)
+	sr, err := l.Search(ctx, searchRequest)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("TestSearch: %s -> num of entries = %d", searchRequest.Filter, len(sr.Entries))
 }
 
-func TestSearchStartTLS(t *testing.T) {
-	l, err := DialURL(ldapServer)
+func TestSearchDeadlineExceeded(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	l, err := DialURL(ctx, ldapServer)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +128,34 @@ func TestSearchStartTLS(t *testing.T) {
 		attributes,
 		nil)
 
-	sr, err := l.Search(searchRequest)
+	rCtx, rCancel := context.WithTimeout(ctx, 5 * time.Millisecond)
+	defer rCancel()
+	_, err = l.Search(rCtx, searchRequest)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatal("expected context deadline exceeded")
+	}
+	if _, err = l.SearchWithPaging(ctx, searchRequest, 0); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSearchStartTLS(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	l, err := DialURL(ctx, ldapServer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+
+	searchRequest := NewSearchRequest(
+		baseDN,
+		ScopeWholeSubtree, DerefAlways, 0, 0, false,
+		filter[0],
+		attributes,
+		nil)
+
+	sr, err := l.Search(ctx, searchRequest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,12 +163,12 @@ func TestSearchStartTLS(t *testing.T) {
 	t.Logf("TestSearchStartTLS: %s -> num of entries = %d", searchRequest.Filter, len(sr.Entries))
 
 	t.Log("TestSearchStartTLS: upgrading with startTLS")
-	err = l.StartTLS(&tls.Config{InsecureSkipVerify: true})
+	err = l.StartTLS(ctx, &tls.Config{InsecureSkipVerify: true})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	sr, err = l.Search(searchRequest)
+	sr, err = l.Search(ctx, searchRequest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,13 +177,15 @@ func TestSearchStartTLS(t *testing.T) {
 }
 
 func TestSearchWithPaging(t *testing.T) {
-	l, err := DialURL(ldapServer)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	l, err := DialURL(ctx, ldapServer)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer l.Close()
 
-	err = l.UnauthenticatedBind("")
+	err = l.UnauthenticatedBind(ctx, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,7 +196,7 @@ func TestSearchWithPaging(t *testing.T) {
 		filter[2],
 		attributes,
 		nil)
-	sr, err := l.SearchWithPaging(searchRequest, 5)
+	sr, err := l.SearchWithPaging(ctx, searchRequest, 5)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +209,7 @@ func TestSearchWithPaging(t *testing.T) {
 		filter[2],
 		attributes,
 		[]Control{NewControlPaging(5)})
-	sr, err = l.SearchWithPaging(searchRequest, 5)
+	sr, err = l.SearchWithPaging(ctx, searchRequest, 5)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,20 +222,20 @@ func TestSearchWithPaging(t *testing.T) {
 		filter[2],
 		attributes,
 		[]Control{NewControlPaging(500)})
-	sr, err = l.SearchWithPaging(searchRequest, 5)
+	sr, err = l.SearchWithPaging(ctx, searchRequest, 5)
 	if err == nil {
 		t.Fatal("expected an error when paging size in control in search request doesn't match size given in call, got none")
 	}
 }
 
-func searchGoroutine(t *testing.T, l *Conn, results chan *SearchResult, i int) {
+func searchGoroutine(t *testing.T, ctx context.Context, l *Conn, results chan *SearchResult, i int) {
 	searchRequest := NewSearchRequest(
 		baseDN,
 		ScopeWholeSubtree, DerefAlways, 0, 0, false,
 		filter[i],
 		attributes,
 		nil)
-	sr, err := l.Search(searchRequest)
+	sr, err := l.Search(ctx, searchRequest)
 	if err != nil {
 		t.Error(err)
 		results <- nil
@@ -190,24 +244,24 @@ func searchGoroutine(t *testing.T, l *Conn, results chan *SearchResult, i int) {
 	results <- sr
 }
 
-func testMultiGoroutineSearch(t *testing.T, TLS bool, startTLS bool) {
+func testMultiGoroutineSearch(t *testing.T, ctx context.Context, TLS bool, startTLS bool) {
 	var l *Conn
 	var err error
 	if TLS {
-		l, err = DialURL(ldapsServer, DialWithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
+		l, err = DialURL(ctx, ldapsServer, DialWithTLSConfig(&tls.Config{InsecureSkipVerify: true}))
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer l.Close()
 	} else {
-		l, err = DialURL(ldapServer)
+		l, err = DialURL(ctx, ldapServer)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer l.Close()
 		if startTLS {
 			t.Log("TestMultiGoroutineSearch: using StartTLS...")
-			err := l.StartTLS(&tls.Config{InsecureSkipVerify: true})
+			err := l.StartTLS(ctx, &tls.Config{InsecureSkipVerify: true})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -217,7 +271,7 @@ func testMultiGoroutineSearch(t *testing.T, TLS bool, startTLS bool) {
 	results := make([]chan *SearchResult, len(filter))
 	for i := range filter {
 		results[i] = make(chan *SearchResult)
-		go searchGoroutine(t, l, results[i], i)
+		go searchGoroutine(t, ctx, l, results[i], i)
 	}
 	for i := range filter {
 		sr := <-results[i]
@@ -230,9 +284,11 @@ func testMultiGoroutineSearch(t *testing.T, TLS bool, startTLS bool) {
 }
 
 func TestMultiGoroutineSearch(t *testing.T) {
-	testMultiGoroutineSearch(t, false, false)
-	testMultiGoroutineSearch(t, true, true)
-	testMultiGoroutineSearch(t, false, true)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	testMultiGoroutineSearch(t, ctx, false, false)
+	testMultiGoroutineSearch(t, ctx, true, true)
+	testMultiGoroutineSearch(t, ctx, false, true)
 }
 
 func TestEscapeFilter(t *testing.T) {
@@ -245,7 +301,9 @@ func TestEscapeFilter(t *testing.T) {
 }
 
 func TestCompare(t *testing.T) {
-	l, err := DialURL(ldapServer)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	l, err := DialURL(ctx, ldapServer)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -255,7 +313,7 @@ func TestCompare(t *testing.T) {
 	const attribute = "cn"
 	const value = "math mich"
 
-	sr, err := l.Compare(dn, attribute, value)
+	sr, err := l.Compare(ctx, dn, attribute, value)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -264,7 +322,9 @@ func TestCompare(t *testing.T) {
 }
 
 func TestMatchDNError(t *testing.T) {
-	l, err := DialURL(ldapServer)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	l, err := DialURL(ctx, ldapServer)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -279,7 +339,7 @@ func TestMatchDNError(t *testing.T) {
 		attributes,
 		nil)
 
-	_, err = l.Search(searchRequest)
+	_, err = l.Search(ctx, searchRequest)
 	if err == nil {
 		t.Fatal("Expected Error, got nil")
 	}

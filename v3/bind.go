@@ -2,6 +2,7 @@ package ldap
 
 import (
 	"bytes"
+	"context"
 	"crypto/md5"
 	enchex "encoding/hex"
 	"errors"
@@ -57,16 +58,16 @@ func (req *SimpleBindRequest) appendTo(envelope *ber.Packet) error {
 }
 
 // SimpleBind performs the simple bind operation defined in the given request
-func (l *Conn) SimpleBind(simpleBindRequest *SimpleBindRequest) (*SimpleBindResult, error) {
+func (l *Conn) SimpleBind(ctx context.Context, simpleBindRequest *SimpleBindRequest) (*SimpleBindResult, error) {
 	if simpleBindRequest.Password == "" && !simpleBindRequest.AllowEmptyPassword {
 		return nil, NewError(ErrorEmptyPassword, errors.New("ldap: empty password not allowed by the client"))
 	}
 
-	msgCtx, err := l.doRequest(simpleBindRequest)
+	msgCtx, err := l.doRequest(ctx, simpleBindRequest)
 	if err != nil {
 		return nil, err
 	}
-	defer l.finishMessage(msgCtx)
+	defer l.finishMessage(ctx, msgCtx)
 
 	packet, err := l.readPacket(msgCtx)
 	if err != nil {
@@ -95,13 +96,13 @@ func (l *Conn) SimpleBind(simpleBindRequest *SimpleBindRequest) (*SimpleBindResu
 //
 // It does not allow unauthenticated bind (i.e. empty password). Use the UnauthenticatedBind method
 // for that.
-func (l *Conn) Bind(username, password string) error {
+func (l *Conn) Bind(ctx context.Context, username, password string) error {
 	req := &SimpleBindRequest{
 		Username:           username,
 		Password:           password,
 		AllowEmptyPassword: false,
 	}
-	_, err := l.SimpleBind(req)
+	_, err := l.SimpleBind(ctx, req)
 	return err
 }
 
@@ -112,13 +113,13 @@ func (l *Conn) Bind(username, password string) error {
 //
 // See https://tools.ietf.org/html/rfc4513#section-5.1.2 .
 // See https://tools.ietf.org/html/rfc4513#section-6.3.1 .
-func (l *Conn) UnauthenticatedBind(username string) error {
+func (l *Conn) UnauthenticatedBind(ctx context.Context, username string) error {
 	req := &SimpleBindRequest{
 		Username:           username,
 		Password:           "",
 		AllowEmptyPassword: true,
 	}
-	_, err := l.SimpleBind(req)
+	_, err := l.SimpleBind(ctx, req)
 	return err
 }
 
@@ -154,27 +155,27 @@ type DigestMD5BindResult struct {
 }
 
 // MD5Bind performs a digest-md5 bind with the given host, username and password.
-func (l *Conn) MD5Bind(host, username, password string) error {
+func (l *Conn) MD5Bind(ctx context.Context, host, username, password string) error {
 	req := &DigestMD5BindRequest{
 		Host:     host,
 		Username: username,
 		Password: password,
 	}
-	_, err := l.DigestMD5Bind(req)
+	_, err := l.DigestMD5Bind(ctx, req)
 	return err
 }
 
 // DigestMD5Bind performs the digest-md5 bind operation defined in the given request
-func (l *Conn) DigestMD5Bind(digestMD5BindRequest *DigestMD5BindRequest) (*DigestMD5BindResult, error) {
+func (l *Conn) DigestMD5Bind(ctx context.Context, digestMD5BindRequest *DigestMD5BindRequest) (*DigestMD5BindResult, error) {
 	if digestMD5BindRequest.Password == "" {
 		return nil, NewError(ErrorEmptyPassword, errors.New("ldap: empty password not allowed by the client"))
 	}
 
-	msgCtx, err := l.doRequest(digestMD5BindRequest)
+	msgCtx, err := l.doRequest(ctx, digestMD5BindRequest)
 	if err != nil {
 		return nil, err
 	}
-	defer l.finishMessage(msgCtx)
+	defer l.finishMessage(ctx, msgCtx)
 
 	packet, err := l.readPacket(msgCtx)
 	if err != nil {
@@ -235,11 +236,11 @@ func (l *Conn) DigestMD5Bind(digestMD5BindRequest *DigestMD5BindRequest) (*Diges
 		auth.AppendChild(ber.NewString(ber.ClassUniversal, ber.TypePrimitive, ber.TagOctetString, resp, "Credentials"))
 		request.AppendChild(auth)
 		packet.AppendChild(request)
-		msgCtx, err = l.sendMessage(packet)
+		msgCtx, err = l.sendMessage(ctx, packet)
 		if err != nil {
 			return nil, fmt.Errorf("send message: %s", err)
 		}
-		defer l.finishMessage(msgCtx)
+		defer l.finishMessage(ctx, msgCtx)
 		packetResponse, ok := <-msgCtx.responses
 		if !ok {
 			return nil, NewError(ErrorNetwork, errors.New("ldap: response channel closed"))
@@ -374,12 +375,12 @@ var externalBindRequest = requestFunc(func(envelope *ber.Packet) error {
 // Use ldap.DialURL("ldapi://") to connect to the Unix socket before ExternalBind.
 //
 // See https://tools.ietf.org/html/rfc4422#appendix-A
-func (l *Conn) ExternalBind() error {
-	msgCtx, err := l.doRequest(externalBindRequest)
+func (l *Conn) ExternalBind(ctx context.Context) error {
+	msgCtx, err := l.doRequest(ctx, externalBindRequest)
 	if err != nil {
 		return err
 	}
-	defer l.finishMessage(msgCtx)
+	defer l.finishMessage(ctx, msgCtx)
 
 	packet, err := l.readPacket(msgCtx)
 	if err != nil {
@@ -432,38 +433,38 @@ type NTLMBindResult struct {
 }
 
 // NTLMBind performs an NTLMSSP Bind with the given domain, username and password
-func (l *Conn) NTLMBind(domain, username, password string) error {
+func (l *Conn) NTLMBind(ctx context.Context, domain, username, password string) error {
 	req := &NTLMBindRequest{
 		Domain:   domain,
 		Username: username,
 		Password: password,
 	}
-	_, err := l.NTLMChallengeBind(req)
+	_, err := l.NTLMChallengeBind(ctx, req)
 	return err
 }
 
 // NTLMBindWithHash performs an NTLM Bind with an NTLM hash instead of plaintext password (pass-the-hash)
-func (l *Conn) NTLMBindWithHash(domain, username, hash string) error {
+func (l *Conn) NTLMBindWithHash(ctx context.Context, domain, username, hash string) error {
 	req := &NTLMBindRequest{
 		Domain:   domain,
 		Username: username,
 		Hash:     hash,
 	}
-	_, err := l.NTLMChallengeBind(req)
+	_, err := l.NTLMChallengeBind(ctx, req)
 	return err
 }
 
 // NTLMChallengeBind performs the NTLMSSP bind operation defined in the given request
-func (l *Conn) NTLMChallengeBind(ntlmBindRequest *NTLMBindRequest) (*NTLMBindResult, error) {
+func (l *Conn) NTLMChallengeBind(ctx context.Context, ntlmBindRequest *NTLMBindRequest) (*NTLMBindResult, error) {
 	if ntlmBindRequest.Password == "" && ntlmBindRequest.Hash == "" {
 		return nil, NewError(ErrorEmptyPassword, errors.New("ldap: empty password not allowed by the client"))
 	}
 
-	msgCtx, err := l.doRequest(ntlmBindRequest)
+	msgCtx, err := l.doRequest(ctx, ntlmBindRequest)
 	if err != nil {
 		return nil, err
 	}
-	defer l.finishMessage(msgCtx)
+	defer l.finishMessage(ctx, msgCtx)
 	packet, err := l.readPacket(msgCtx)
 	if err != nil {
 		return nil, err
@@ -518,11 +519,11 @@ func (l *Conn) NTLMChallengeBind(ntlmBindRequest *NTLMBindRequest) (*NTLMBindRes
 
 		request.AppendChild(auth)
 		packet.AppendChild(request)
-		msgCtx, err = l.sendMessage(packet)
+		msgCtx, err = l.sendMessage(ctx, packet)
 		if err != nil {
 			return nil, fmt.Errorf("send message: %s", err)
 		}
-		defer l.finishMessage(msgCtx)
+		defer l.finishMessage(ctx, msgCtx)
 		packetResponse, ok := <-msgCtx.responses
 		if !ok {
 			return nil, NewError(ErrorNetwork, errors.New("ldap: response channel closed"))
