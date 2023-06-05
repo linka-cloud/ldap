@@ -148,9 +148,11 @@ func parseSearchRequest(boundDN string, req *ber.Packet, controls *[]Control) (S
 		}
 		attributes = append(attributes, a)
 	}
-	searchReq := SearchRequest{baseObject, scope,
+	searchReq := SearchRequest{
+		baseObject, scope,
 		derefAliases, sizeLimit, timeLimit,
-		typesOnly, filter, attributes, *controls}
+		typesOnly, filter, attributes, *controls,
+	}
 
 	return searchReq, nil
 }

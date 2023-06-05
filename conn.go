@@ -308,7 +308,6 @@ func (l *Conn) reader() {
 
 // Use Abandon operation to perform connection keepalives
 func (l *Conn) Ping() error {
-
 	messageID := l.nextMessageID()
 
 	packet := ber.Encode(ber.ClassUniversal, ber.TypeConstructed, ber.TagSequence, nil, "LDAP Request")

@@ -108,39 +108,51 @@ func NewServer() *Server {
 	s.Stats = nil
 	return s
 }
+
 func (server *Server) BindFunc(baseDN string, f Binder) {
 	server.BindFns[baseDN] = f
 }
+
 func (server *Server) SearchFunc(baseDN string, f Searcher) {
 	server.SearchFns[baseDN] = f
 }
+
 func (server *Server) AddFunc(baseDN string, f Adder) {
 	server.AddFns[baseDN] = f
 }
+
 func (server *Server) ModifyFunc(baseDN string, f Modifier) {
 	server.ModifyFns[baseDN] = f
 }
+
 func (server *Server) DeleteFunc(baseDN string, f Deleter) {
 	server.DeleteFns[baseDN] = f
 }
+
 func (server *Server) ModifyDNFunc(baseDN string, f ModifyDNr) {
 	server.ModifyDNFns[baseDN] = f
 }
+
 func (server *Server) CompareFunc(baseDN string, f Comparer) {
 	server.CompareFns[baseDN] = f
 }
+
 func (server *Server) AbandonFunc(baseDN string, f Abandoner) {
 	server.AbandonFns[baseDN] = f
 }
+
 func (server *Server) ExtendedFunc(baseDN string, f Extender) {
 	server.ExtendedFns[baseDN] = f
 }
+
 func (server *Server) UnbindFunc(baseDN string, f Unbinder) {
 	server.UnbindFns[baseDN] = f
 }
+
 func (server *Server) CloseFunc(baseDN string, f Closer) {
 	server.CloseFns[baseDN] = f
 }
+
 func (server *Server) QuitChannel(quit chan bool) {
 	server.Quit = quit
 }
@@ -258,8 +270,8 @@ handler:
 			}
 		}
 
-		//log.Printf("DEBUG: handling operation: %s [%d]", ApplicationMap[req.Tag], req.Tag)
-		//ber.PrintPacket(packet) // DEBUG
+		// log.Printf("DEBUG: handling operation: %s [%d]", ApplicationMap[req.Tag], req.Tag)
+		// ber.PrintPacket(packet) // DEBUG
 
 		// dispatch the LDAP operation
 		switch req.Tag { // ldap op code
@@ -310,7 +322,7 @@ handler:
 				name := ber.DecodeString(req.Children[0].Data.Bytes())
 				if name == "1.3.6.1.4.1.1466.20037" && server.StartTls != nil && !tlsActive {
 					responseType := uint8(ApplicationExtendedResponse)
-					//start tls
+					// start tls
 					// log.Println("START_TLS")
 					// ber.PrintPacket(req)
 					ldapResultCode := LDAPResultCode(LDAPResultSuccess)
@@ -430,39 +442,48 @@ func encodeLDAPResponse(messageID uint64, responseType uint8, ldapResultCode LDA
 	return responsePacket
 }
 
-type defaultHandler struct {
-}
+type defaultHandler struct{}
 
 func (h defaultHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error) {
 	return LDAPResultInvalidCredentials, nil
 }
+
 func (h defaultHandler) Search(boundDN string, req SearchRequest, conn net.Conn) (ServerSearchResult, error) {
 	return ServerSearchResult{make([]*Entry, 0), []string{}, []Control{}, LDAPResultSuccess}, nil
 }
+
 func (h defaultHandler) Add(boundDN string, req AddRequest, conn net.Conn) (LDAPResultCode, error) {
 	return LDAPResultInsufficientAccessRights, nil
 }
+
 func (h defaultHandler) Modify(boundDN string, req ModifyRequest, conn net.Conn) (LDAPResultCode, error) {
 	return LDAPResultInsufficientAccessRights, nil
 }
+
 func (h defaultHandler) Delete(boundDN, deleteDN string, conn net.Conn) (LDAPResultCode, error) {
 	return LDAPResultInsufficientAccessRights, nil
 }
+
 func (h defaultHandler) ModifyDN(boundDN string, req ModifyDNRequest, conn net.Conn) (LDAPResultCode, error) {
 	return LDAPResultInsufficientAccessRights, nil
 }
+
 func (h defaultHandler) Compare(boundDN string, req CompareRequest, conn net.Conn) (LDAPResultCode, error) {
 	return LDAPResultInsufficientAccessRights, nil
 }
+
 func (h defaultHandler) Abandon(boundDN string, conn net.Conn) error {
 	return nil
 }
+
 func (h defaultHandler) Extended(boundDN string, req ExtendedRequest, conn net.Conn) (LDAPResultCode, error) {
 	return LDAPResultProtocolError, nil
 }
+
 func (h defaultHandler) Unbind(boundDN string, conn net.Conn) (LDAPResultCode, error) {
 	return LDAPResultSuccess, nil
 }
+
 func (h defaultHandler) Close(boundDN string, conn net.Conn) error {
 	conn.Close()
 	return nil
@@ -475,6 +496,7 @@ func (stats *Stats) countConns(delta int) {
 		stats.statsMutex.Unlock()
 	}
 }
+
 func (stats *Stats) countBinds(delta int) {
 	if stats != nil {
 		stats.statsMutex.Lock()
@@ -482,6 +504,7 @@ func (stats *Stats) countBinds(delta int) {
 		stats.statsMutex.Unlock()
 	}
 }
+
 func (stats *Stats) countUnbinds(delta int) {
 	if stats != nil {
 		stats.statsMutex.Lock()
@@ -489,6 +512,7 @@ func (stats *Stats) countUnbinds(delta int) {
 		stats.statsMutex.Unlock()
 	}
 }
+
 func (stats *Stats) countSearches(delta int) {
 	if stats != nil {
 		stats.statsMutex.Lock()

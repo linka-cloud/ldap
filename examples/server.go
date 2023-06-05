@@ -34,8 +34,7 @@ func main() {
 	}
 }
 
-type ldapHandler struct {
-}
+type ldapHandler struct{}
 
 ///////////// Allow anonymous binds only
 func (h ldapHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.LDAPResultCode, error) {
@@ -48,21 +47,21 @@ func (h ldapHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.LDAP
 ///////////// Return some hardcoded search results - we'll respond to any baseDN for testing
 func (h ldapHandler) Search(boundDN string, searchReq ldap.SearchRequest, conn net.Conn) (ldap.ServerSearchResult, error) {
 	entries := []*ldap.Entry{
-		&ldap.Entry{"cn=ned," + searchReq.BaseDN, []*ldap.EntryAttribute{
-			&ldap.EntryAttribute{"cn", []string{"ned"}},
-			&ldap.EntryAttribute{"uidNumber", []string{"5000"}},
-			&ldap.EntryAttribute{"accountStatus", []string{"active"}},
-			&ldap.EntryAttribute{"uid", []string{"ned"}},
-			&ldap.EntryAttribute{"description", []string{"ned"}},
-			&ldap.EntryAttribute{"objectClass", []string{"posixAccount"}},
+		{"cn=ned," + searchReq.BaseDN, []*ldap.EntryAttribute{
+			{"cn", []string{"ned"}},
+			{"uidNumber", []string{"5000"}},
+			{"accountStatus", []string{"active"}},
+			{"uid", []string{"ned"}},
+			{"description", []string{"ned"}},
+			{"objectClass", []string{"posixAccount"}},
 		}},
-		&ldap.Entry{"cn=trent," + searchReq.BaseDN, []*ldap.EntryAttribute{
-			&ldap.EntryAttribute{"cn", []string{"trent"}},
-			&ldap.EntryAttribute{"uidNumber", []string{"5005"}},
-			&ldap.EntryAttribute{"accountStatus", []string{"active"}},
-			&ldap.EntryAttribute{"uid", []string{"trent"}},
-			&ldap.EntryAttribute{"description", []string{"trent"}},
-			&ldap.EntryAttribute{"objectClass", []string{"posixAccount"}},
+		{"cn=trent," + searchReq.BaseDN, []*ldap.EntryAttribute{
+			{"cn", []string{"trent"}},
+			{"uidNumber", []string{"5005"}},
+			{"accountStatus", []string{"active"}},
+			{"uid", []string{"trent"}},
+			{"description", []string{"trent"}},
+			{"objectClass", []string{"posixAccount"}},
 		}},
 	}
 	return ldap.ServerSearchResult{entries, []string{}, []ldap.Control{}, ldap.LDAPResultSuccess}, nil

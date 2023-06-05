@@ -299,7 +299,8 @@ func (l *Conn) Search(searchRequest *SearchRequest) (*SearchResult, error) {
 	result := &SearchResult{
 		Entries:   make([]*Entry, 0),
 		Referrals: make([]string, 0),
-		Controls:  make([]Control, 0)}
+		Controls:  make([]Control, 0),
+	}
 
 	foundSearchResultDone := false
 	for !foundSearchResultDone {

@@ -91,9 +91,10 @@ func (h ldapHandler) Search(boundDN string, searchReq ldap.SearchRequest, conn n
 	if err != nil {
 		return ldap.ServerSearchResult{}, err
 	}
-	//log.Printf("P: Search OK: %s -> num of entries = %d\n", search.Filter, len(sr.Entries))
+	// log.Printf("P: Search OK: %s -> num of entries = %d\n", search.Filter, len(sr.Entries))
 	return ldap.ServerSearchResult{sr.Entries, []string{}, []ldap.Control{}, ldap.LDAPResultSuccess}, nil
 }
+
 func (h ldapHandler) Close(boundDN string, conn net.Conn) error {
 	conn.Close() // close connection to the server when then client is closed
 	h.lock.Lock()
@@ -101,6 +102,7 @@ func (h ldapHandler) Close(boundDN string, conn net.Conn) error {
 	delete(h.sessions, connID(conn))
 	return nil
 }
+
 func connID(conn net.Conn) string {
 	h := sha256.New()
 	h.Write([]byte(conn.LocalAddr().String() + conn.RemoteAddr().String()))

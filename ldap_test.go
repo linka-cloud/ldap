@@ -5,16 +5,20 @@ import (
 	"testing"
 )
 
-var ldapServer = "ldap.itd.umich.edu"
-var ldapPort = uint16(389)
-var baseDN = "dc=umich,dc=edu"
-var filter = []string{
-	"(cn=cis-fac)",
-	"(&(objectclass=rfc822mailgroup)(cn=*Computer*))",
-	"(&(objectclass=rfc822mailgroup)(cn=*Mathematics*))"}
+var (
+	ldapServer = "ldap.itd.umich.edu"
+	ldapPort   = uint16(389)
+	baseDN     = "dc=umich,dc=edu"
+	filter     = []string{
+		"(cn=cis-fac)",
+		"(&(objectclass=rfc822mailgroup)(cn=*Computer*))",
+		"(&(objectclass=rfc822mailgroup)(cn=*Mathematics*))",
+	}
+)
 var attributes = []string{
 	"cn",
-	"description"}
+	"description",
+}
 
 func TestConnect(t *testing.T) {
 	fmt.Printf("TestConnect: starting...\n")
