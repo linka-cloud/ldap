@@ -8,7 +8,6 @@ import (
 	"time"
 )
 
-//
 func TestAdd(t *testing.T) {
 	quit := make(chan bool)
 	done := make(chan bool)
@@ -45,7 +44,6 @@ func TestAdd(t *testing.T) {
 	quit <- true
 }
 
-//
 func TestDelete(t *testing.T) {
 	quit := make(chan bool)
 	done := make(chan bool)
@@ -151,7 +149,6 @@ func TestModifyDN(t *testing.T) {
 }
 */
 
-//
 type modifyTestHandler struct {
 }
 

@@ -15,7 +15,7 @@ var ldapURL = "ldap://" + listenString
 var timeout = 400 * time.Millisecond
 var serverBaseDN = "o=testers,c=test"
 
-/////////////////////////
+// ///////////////////////
 func TestBindAnonOK(t *testing.T) {
 	quit := make(chan bool)
 	done := make(chan bool)
@@ -45,7 +45,7 @@ func TestBindAnonOK(t *testing.T) {
 	quit <- true
 }
 
-/////////////////////////
+// ///////////////////////
 func TestBindAnonFail(t *testing.T) {
 	quit := make(chan bool)
 	done := make(chan bool)
@@ -76,7 +76,7 @@ func TestBindAnonFail(t *testing.T) {
 	quit <- true
 }
 
-/////////////////////////
+// ///////////////////////
 func TestBindSimpleOK(t *testing.T) {
 	quit := make(chan bool)
 	done := make(chan bool)
@@ -110,7 +110,7 @@ func TestBindSimpleOK(t *testing.T) {
 	quit <- true
 }
 
-/////////////////////////
+// ///////////////////////
 func TestBindSimpleFailBadPw(t *testing.T) {
 	quit := make(chan bool)
 	done := make(chan bool)
@@ -143,7 +143,7 @@ func TestBindSimpleFailBadPw(t *testing.T) {
 	quit <- true
 }
 
-/////////////////////////
+// ///////////////////////
 func TestBindSimpleFailBadDn(t *testing.T) {
 	quit := make(chan bool)
 	done := make(chan bool)
@@ -176,7 +176,7 @@ func TestBindSimpleFailBadDn(t *testing.T) {
 	quit <- true
 }
 
-/////////////////////////
+// ///////////////////////
 func TestBindSSL(t *testing.T) {
 	ldapURLSSL := "ldaps://" + listenString
 	longerTimeout := 300 * time.Millisecond
@@ -209,7 +209,7 @@ func TestBindSSL(t *testing.T) {
 	quit <- true
 }
 
-/////////////////////////
+// ///////////////////////
 func TestBindPanic(t *testing.T) {
 	quit := make(chan bool)
 	done := make(chan bool)
@@ -239,7 +239,7 @@ func TestBindPanic(t *testing.T) {
 	quit <- true
 }
 
-/////////////////////////
+// ///////////////////////
 type testStatsWriter struct {
 	buffer *bytes.Buffer
 }
@@ -290,7 +290,7 @@ func TestSearchStats(t *testing.T) {
 	quit <- true
 }
 
-/////////////////////////
+// ///////////////////////
 type bindAnonOK struct {
 }
 
@@ -338,7 +338,6 @@ func (b bindCaseInsensitive) Bind(bindDN, bindSimplePw string, conn net.Conn) (L
 	}
 	return LDAPResultInvalidCredentials, nil
 }
-
 
 type searchSimple struct {
 }
@@ -420,7 +419,6 @@ func (s searchControls) Search(boundDN string, searchReq SearchRequest, conn net
 	return ServerSearchResult{entries, []string{}, []Control{}, LDAPResultSuccess}, nil
 }
 
-
 type searchCaseInsensitive struct {
 }
 
@@ -438,7 +436,6 @@ func (s searchCaseInsensitive) Search(boundDN string, searchReq SearchRequest, c
 	}
 	return ServerSearchResult{entries, []string{}, []Control{}, LDAPResultSuccess}, nil
 }
-
 
 func TestRouteFunc(t *testing.T) {
 	if routeFunc("", []string{"a", "xyz", "tt"}) != "" {
