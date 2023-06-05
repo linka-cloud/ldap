@@ -1,4 +1,4 @@
-module github.com/nmcclain/ldap
+module beryju.io/ldap
 
 go 1.14
 
