@@ -58,8 +58,10 @@ type Server struct {
 	ExtendedFns map[string]Extender
 	UnbindFns   map[string]Unbinder
 	CloseFns    map[string]Closer
+	StartTls    *tls.Config
 	Quit        chan bool
 	EnforceLDAP bool
+	tlsActive   bool
 	Stats       *Stats
 }
 
@@ -151,12 +153,13 @@ func (server *Server) ListenAndServeTLS(listenString string, certFile string, ke
 	if err != nil {
 		return err
 	}
-	tlsConfig := tls.Config{Certificates: []tls.Certificate{cert}}
-	tlsConfig.ServerName = "localhost"
-	ln, err := tls.Listen("tcp", listenString, &tlsConfig)
+	server.StartTls = &tls.Config{Certificates: []tls.Certificate{cert}}
+	server.StartTls.ServerName = "localhost"
+	ln, err := tls.Listen("tcp", listenString, server.StartTls)
 	if err != nil {
 		return err
 	}
+	server.tlsActive = true
 	err = server.Serve(ln)
 	if err != nil {
 		return err
@@ -224,7 +227,7 @@ listener:
 //
 func (server *Server) handleConnection(conn net.Conn) {
 	boundDN := "" // "" == anonymous
-
+	tlsActive := server.tlsActive
 handler:
 	for {
 		// read incoming LDAP packet
@@ -308,6 +311,33 @@ handler:
 			server.Stats.countUnbinds(1)
 			break handler // simply disconnect
 		case ApplicationExtendedRequest:
+			if len(req.Children) == 1 {
+				name := ber.DecodeString(req.Children[0].Data.Bytes())
+				if name == "1.3.6.1.4.1.1466.20037" && server.StartTls != nil {
+					//start tls
+					log.Println("START_TLS")
+					ber.PrintPacket(req)
+					responseType := uint8(ApplicationExtendedResponse)
+					ldapResultCode := LDAPResultCode(LDAPResultSuccess)
+					responsePacket := ber.Encode(ber.ClassUniversal, ber.TypeConstructed, ber.TagSequence, nil, "LDAP Response")
+					responsePacket.AppendChild(ber.NewInteger(ber.ClassUniversal, ber.TypePrimitive, ber.TagInteger, messageID, "Message ID"))
+					reponse := ber.Encode(ber.ClassApplication, ber.TypeConstructed, responseType, nil, ApplicationMap[responseType])
+					reponse.AppendChild(ber.NewInteger(ber.ClassUniversal, ber.TypePrimitive, ber.TagEnumerated, uint64(ldapResultCode), "resultCode: "))
+					reponse.AppendChild(ber.NewString(ber.ClassContext, ber.TypePrimitive, ber.TagEOC, "1.3.6.1.4.1.1466.20037", "START_TLS_OID: "))
+					reponse.AppendChild(ber.NewString(ber.ClassUniversal, ber.TypePrimitive, ber.TagOctetString, LDAPResultCodeMap[ldapResultCode], "errorMessage: "))
+					responsePacket.AppendChild(reponse)
+					//responsePacket := encodeLDAPResponse(messageID, ApplicationExtendedResponse, LDAPResultSuccess, "1.3.6.1.4.1.1466.20037")
+					ber.PrintPacket(responsePacket)
+					if err = sendPacket(conn, responsePacket); err != nil {
+						log.Printf("sendPacket error %s", err.Error())
+						break handler
+					}
+					if !tlsActive {
+						tlsActive = true
+						conn = tls.Server(conn, server.StartTls)
+					}
+				}
+			}
 			ldapResultCode := HandleExtendedRequest(req, boundDN, server.ExtendedFns, conn)
 			responsePacket := encodeLDAPResponse(messageID, ApplicationExtendedResponse, ldapResultCode, LDAPResultCodeMap[ldapResultCode])
 			if err = sendPacket(conn, responsePacket); err != nil {
@@ -380,7 +410,7 @@ func routeFunc(dn string, funcNames []string) string {
 	dnMatch := "," + strings.ToLower(dn)
 	var weight int
 	for _, fn := range funcNames {
-		if strings.HasSuffix(dnMatch, "," + fn) {
+		if strings.HasSuffix(dnMatch, ","+fn) {
 			//  empty string as 0, no-comma string 1 , etc
 			if fn == "" {
 				weight = 0
