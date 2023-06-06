@@ -162,9 +162,9 @@ func (server *Server) ListenAndServeTLS(listenString string, certFile string, ke
 	if err != nil {
 		return err
 	}
-	server.StartTls = &tls.Config{Certificates: []tls.Certificate{cert}}
-	server.StartTls.ServerName = "localhost"
-	ln, err := tls.Listen("tcp", listenString, server.StartTls)
+	tlsConfig := &tls.Config{Certificates: []tls.Certificate{cert}}
+	tlsConfig.ServerName = "localhost"
+	ln, err := tls.Listen("tcp", listenString, tlsConfig)
 	if err != nil {
 		return err
 	}

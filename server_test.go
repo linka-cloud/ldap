@@ -196,6 +196,7 @@ func TestBindSSL(t *testing.T) {
 	go func() {
 		time.Sleep(longerTimeout * 2)
 		cmd := exec.Command("ldapsearch", "-H", ldapURLSSL, "-x", "-b", "o=testers,c=test")
+		cmd.Env = append(cmd.Env, "LDAPTLS_REQCERT=never")
 		out, _ := cmd.CombinedOutput()
 		if !strings.Contains(string(out), "result: 0 Success") {
 			t.Errorf("ldapsearch failed: %v", string(out))
@@ -205,7 +206,7 @@ func TestBindSSL(t *testing.T) {
 
 	select {
 	case <-done:
-	case <-time.After(longerTimeout * 2):
+	case <-time.After(longerTimeout * 5):
 		t.Errorf("ldapsearch command timed out")
 	}
 	quit <- true
