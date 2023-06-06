@@ -18,6 +18,9 @@ jobs:
       - uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go }}
+      - run: |
+          sudo apt update
+          sudo apt install -y ldap-utils
       - name: Build
         run: go build -v ./...
       - name: Test
