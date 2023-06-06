@@ -57,7 +57,7 @@ type Server struct {
 	ExtendedFns map[string]Extender
 	UnbindFns   map[string]Unbinder
 	CloseFns    map[string]Closer
-	StartTls    *tls.Config
+	StartTLS    *tls.Config
 	Quit        chan bool
 	EnforceLDAP bool
 	Stats       *Stats
@@ -323,7 +323,7 @@ handler:
 		case ApplicationExtendedRequest:
 			if len(req.Children) == 1 {
 				name := ber.DecodeString(req.Children[0].Data.Bytes())
-				if name == "1.3.6.1.4.1.1466.20037" && server.StartTls != nil && !connectionTLSActive {
+				if name == "1.3.6.1.4.1.1466.20037" && server.StartTLS != nil && !connectionTLSActive {
 					responseType := uint8(ApplicationExtendedResponse)
 					// start tls
 					// log.Println("START_TLS")
@@ -346,7 +346,7 @@ handler:
 						break handler
 					}
 					connectionTLSActive = true
-					conn = tls.Server(conn, server.StartTls)
+					conn = tls.Server(conn, server.StartTLS)
 					break
 				}
 			}

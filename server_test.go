@@ -225,7 +225,7 @@ func TestBindStartTLS(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		s.StartTls = &tls.Config{
+		s.StartTLS = &tls.Config{
 			Certificates: []tls.Certificate{cert},
 		}
 		if err := s.ListenAndServe(listenString); err != nil {
