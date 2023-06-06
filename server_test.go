@@ -2,6 +2,7 @@ package ldap
 
 import (
 	"bytes"
+	"crypto/tls"
 	"log"
 	"net"
 	"os/exec"
@@ -196,6 +197,45 @@ func TestBindSSL(t *testing.T) {
 	go func() {
 		time.Sleep(longerTimeout * 2)
 		cmd := exec.Command("ldapsearch", "-H", ldapURLSSL, "-x", "-b", "o=testers,c=test")
+		cmd.Env = append(cmd.Env, "LDAPTLS_REQCERT=never")
+		out, _ := cmd.CombinedOutput()
+		if !strings.Contains(string(out), "result: 0 Success") {
+			t.Errorf("ldapsearch failed: %v", string(out))
+		}
+		done <- true
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(longerTimeout * 5):
+		t.Errorf("ldapsearch command timed out")
+	}
+	quit <- true
+}
+
+func TestBindStartTLS(t *testing.T) {
+	longerTimeout := 300 * time.Millisecond
+	quit := make(chan bool)
+	done := make(chan bool)
+	go func() {
+		s := NewServer()
+		s.QuitChannel(quit)
+		s.BindFunc("", bindAnonOK{})
+		cert, err := tls.LoadX509KeyPair("tests/cert_DONOTUSE.pem", "tests/key_DONOTUSE.pem")
+		if err != nil {
+			t.Error(err)
+		}
+		s.StartTls = &tls.Config{
+			Certificates: []tls.Certificate{cert},
+		}
+		if err := s.ListenAndServe(listenString); err != nil {
+			t.Errorf("s.ListenAndServeTLS failed: %s", err.Error())
+		}
+	}()
+
+	go func() {
+		time.Sleep(longerTimeout * 2)
+		cmd := exec.Command("ldapsearch", "-Z", "-H", ldapURL, "-x", "-b", "o=testers,c=test")
 		cmd.Env = append(cmd.Env, "LDAPTLS_REQCERT=never")
 		out, _ := cmd.CombinedOutput()
 		if !strings.Contains(string(out), "result: 0 Success") {
