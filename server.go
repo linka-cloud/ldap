@@ -234,7 +234,10 @@ listener:
 
 func (server *Server) handleConnection(conn net.Conn) {
 	boundDN := "" // "" == anonymous
-	tlsActive := false
+	// If we're listening on SSL and get a new connection it'll already be tls.Conn
+	// otherwise if we're doing StartTLS then the connection might have already
+	// been upgraded
+	_, connectionTLSActive := conn.(*tls.Conn)
 handler:
 	for {
 		// read incoming LDAP packet
@@ -320,7 +323,7 @@ handler:
 		case ApplicationExtendedRequest:
 			if len(req.Children) == 1 {
 				name := ber.DecodeString(req.Children[0].Data.Bytes())
-				if name == "1.3.6.1.4.1.1466.20037" && server.StartTls != nil && !tlsActive {
+				if name == "1.3.6.1.4.1.1466.20037" && server.StartTls != nil && !connectionTLSActive {
 					responseType := uint8(ApplicationExtendedResponse)
 					// start tls
 					// log.Println("START_TLS")
@@ -342,7 +345,7 @@ handler:
 						log.Printf("sendPacket error %s", err.Error())
 						break handler
 					}
-					tlsActive = true
+					connectionTLSActive = true
 					conn = tls.Server(conn, server.StartTls)
 					break
 				}
