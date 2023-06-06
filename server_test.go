@@ -365,7 +365,6 @@ type bindPanic struct{}
 
 func (b bindPanic) Bind(bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error) {
 	panic("test panic at the disco")
-	return LDAPResultInvalidCredentials, nil
 }
 
 type bindCaseInsensitive struct{}
@@ -430,9 +429,7 @@ func (s searchSimple2) Search(boundDN string, searchReq SearchRequest, conn net.
 type searchPanic struct{}
 
 func (s searchPanic) Search(boundDN string, searchReq SearchRequest, conn net.Conn) (ServerSearchResult, error) {
-	entries := []*Entry{}
 	panic("this is a test panic")
-	return ServerSearchResult{entries, []string{}, []Control{}, LDAPResultSuccess}, nil
 }
 
 type searchControls struct{}

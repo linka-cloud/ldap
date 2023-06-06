@@ -262,9 +262,9 @@ func ServerApplyFilter(f *ber.Packet, entry *Entry) (bool, LDAPResultCode) {
 		attribute := f.Children[0].Value.(string)
 		value := f.Children[1].Value.(string)
 		for _, a := range entry.Attributes {
-			if strings.ToLower(a.Name) == strings.ToLower(attribute) {
+			if strings.EqualFold(a.Name, attribute) {
 				for _, v := range a.Values {
-					if strings.ToLower(v) == strings.ToLower(value) {
+					if strings.EqualFold(v, value) {
 						return true, LDAPResultSuccess
 					}
 				}
@@ -272,7 +272,7 @@ func ServerApplyFilter(f *ber.Packet, entry *Entry) (bool, LDAPResultCode) {
 		}
 	case "Present":
 		for _, a := range entry.Attributes {
-			if strings.ToLower(a.Name) == strings.ToLower(f.Data.String()) {
+			if strings.EqualFold(a.Name, f.Data.String()) {
 				return true, LDAPResultSuccess
 			}
 		}

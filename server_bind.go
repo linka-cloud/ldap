@@ -4,7 +4,7 @@ import (
 	"log"
 	"net"
 
-	"github.com/nmcclain/asn1-ber"
+	ber "github.com/nmcclain/asn1-ber"
 )
 
 func HandleBindRequest(req *ber.Packet, fns map[string]Binder, conn net.Conn) (resultCode LDAPResultCode) {
@@ -55,7 +55,6 @@ func HandleBindRequest(req *ber.Packet, fns map[string]Binder, conn net.Conn) (r
 		log.Print("SASL authentication is not supported")
 		return LDAPResultInappropriateAuthentication
 	}
-	return LDAPResultOperationsError
 }
 
 func encodeBindResponse(messageID uint64, ldapResultCode LDAPResultCode) *ber.Packet {
