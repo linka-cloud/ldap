@@ -6,9 +6,9 @@ import (
 )
 
 var (
-	ldapServer = "ldap.itd.umich.edu"
+	ldapServer = "ldap.forumsys.com"
 	ldapPort   = uint16(389)
-	baseDN     = "dc=umich,dc=edu"
+	baseDN     = "dc=example,dc=com"
 	filter     = []string{
 		"(cn=cis-fac)",
 		"(&(objectclass=rfc822mailgroup)(cn=*Computer*))",

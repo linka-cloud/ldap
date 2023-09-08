@@ -4,7 +4,7 @@ import (
 	"log"
 	"net"
 
-	ber "github.com/nmcclain/asn1-ber"
+	ber "github.com/go-asn1-ber/asn1-ber"
 )
 
 func HandleBindRequest(req *ber.Packet, fns map[string]Binder, conn net.Conn) (resultCode LDAPResultCode) {
@@ -15,7 +15,7 @@ func HandleBindRequest(req *ber.Packet, fns map[string]Binder, conn net.Conn) (r
 	}()
 
 	// we only support ldapv3
-	ldapVersion, ok := req.Children[0].Value.(uint64)
+	ldapVersion, ok := req.Children[0].Value.(int64)
 	if !ok {
 		return LDAPResultProtocolError
 	}
