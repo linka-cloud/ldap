@@ -150,9 +150,9 @@ func parseSearchRequest(boundDN string, req *ber.Packet, controls *[]Control) (S
 		attributes = append(attributes, a)
 	}
 	searchReq := SearchRequest{
-		baseObject, scope,
-		derefAliases, sizeLimit, timeLimit,
-		typesOnly, filter, attributes, *controls,
+		BaseDN: baseObject, Scope: scope,
+		DerefAliases: derefAliases, SizeLimit: sizeLimit, TimeLimit: timeLimit,
+		TypesOnly: typesOnly, Filter: filter, Attributes: attributes, Controls: *controls,
 	}
 
 	return searchReq, nil
@@ -172,7 +172,7 @@ func filterAttributes(entry *Entry, attributes []string) (*Entry, error) {
 				// "+supportedControl" is treated as an operational attribute
 				if strings.HasPrefix(attrNameLower, "+") {
 					if requestedLower == "+" || attrNameLower == "+"+requestedLower {
-						newAttributes = append(newAttributes, &EntryAttribute{attr.Name[1:], attr.Values})
+						newAttributes = append(newAttributes, &EntryAttribute{Name: attr.Name[1:], Values: attr.Values})
 						break
 					}
 				} else {

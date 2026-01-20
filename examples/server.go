@@ -1,6 +1,3 @@
-//go:build ignore
-// +build ignore
-
 package main
 
 import (
@@ -50,21 +47,21 @@ func (h ldapHandler) Bind(ctx context.Context, bindDN, bindSimplePw string, conn
 // /////////// Return some hardcoded search results - we'll respond to any baseDN for testing
 func (h ldapHandler) Search(ctx context.Context, boundDN string, searchReq ldap.SearchRequest, conn net.Conn) (ldap.ServerSearchResult, error) {
 	entries := []*ldap.Entry{
-		{"cn=ned," + searchReq.BaseDN, []*ldap.EntryAttribute{
-			{"cn", []string{"ned"}},
-			{"uidNumber", []string{"5000"}},
-			{"accountStatus", []string{"active"}},
-			{"uid", []string{"ned"}},
-			{"description", []string{"ned"}},
-			{"objectClass", []string{"posixAccount"}},
+		{DN: "cn=ned," + searchReq.BaseDN, Attributes: []*ldap.EntryAttribute{
+			{Name: "cn", Values: []string{"ned"}},
+			{Name: "uidNumber", Values: []string{"5000"}},
+			{Name: "accountStatus", Values: []string{"active"}},
+			{Name: "uid", Values: []string{"ned"}},
+			{Name: "description", Values: []string{"ned"}},
+			{Name: "objectClass", Values: []string{"posixAccount"}},
 		}},
-		{"cn=trent," + searchReq.BaseDN, []*ldap.EntryAttribute{
-			{"cn", []string{"trent"}},
-			{"uidNumber", []string{"5005"}},
-			{"accountStatus", []string{"active"}},
-			{"uid", []string{"trent"}},
-			{"description", []string{"trent"}},
-			{"objectClass", []string{"posixAccount"}},
+		{DN: "cn=trent," + searchReq.BaseDN, Attributes: []*ldap.EntryAttribute{
+			{Name: "cn", Values: []string{"trent"}},
+			{Name: "uidNumber", Values: []string{"5005"}},
+			{Name: "accountStatus", Values: []string{"active"}},
+			{Name: "uid", Values: []string{"trent"}},
+			{Name: "description", Values: []string{"trent"}},
+			{Name: "objectClass", Values: []string{"posixAccount"}},
 		}},
 	}
 	return ldap.ServerSearchResult{entries, []string{}, []ldap.Control{}, ldap.LDAPResultSuccess}, nil

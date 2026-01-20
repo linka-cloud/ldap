@@ -13,30 +13,30 @@ func HandleAddRequest(ctx context.Context, req *ber.Packet, boundDN string, fns 
 	}
 	var ok bool
 	addReq := AddRequest{}
-	addReq.dn, ok = req.Children[0].Value.(string)
+	addReq.DN, ok = req.Children[0].Value.(string)
 	if !ok {
 		return LDAPResultProtocolError
 	}
-	addReq.attributes = []Attribute{}
+	addReq.Attributes = []Attribute{}
 	for _, attr := range req.Children[1].Children {
 		if len(attr.Children) != 2 {
 			return LDAPResultProtocolError
 		}
 
 		a := Attribute{}
-		a.attrType, ok = attr.Children[0].Value.(string)
+		a.Type, ok = attr.Children[0].Value.(string)
 		if !ok {
 			return LDAPResultProtocolError
 		}
-		a.attrVals = []string{}
+		a.Vals = []string{}
 		for _, val := range attr.Children[1].Children {
 			v, ok := val.Value.(string)
 			if !ok {
 				return LDAPResultProtocolError
 			}
-			a.attrVals = append(a.attrVals, v)
+			a.Vals = append(a.Vals, v)
 		}
-		addReq.attributes = append(addReq.attributes, a)
+		addReq.Attributes = append(addReq.Attributes, a)
 	}
 	fnNames := []string{}
 	for k := range fns {
@@ -72,7 +72,7 @@ func HandleModifyRequest(ctx context.Context, req *ber.Packet, boundDN string, f
 	}
 	var ok bool
 	modReq := ModifyRequest{}
-	modReq.Dn, ok = req.Children[0].Value.(string)
+	modReq.DN, ok = req.Children[0].Value.(string)
 	if !ok {
 		return LDAPResultProtocolError
 	}
@@ -85,7 +85,7 @@ func HandleModifyRequest(ctx context.Context, req *ber.Packet, boundDN string, f
 		if len(attrs) != 2 {
 			return LDAPResultProtocolError
 		}
-		attr.AttrType, ok = attrs[0].Value.(string)
+		attr.Type, ok = attrs[0].Value.(string)
 		if !ok {
 			return LDAPResultProtocolError
 		}
@@ -94,7 +94,7 @@ func HandleModifyRequest(ctx context.Context, req *ber.Packet, boundDN string, f
 			if !ok {
 				return LDAPResultProtocolError
 			}
-			attr.AttrVals = append(attr.AttrVals, v)
+			attr.Vals = append(attr.Vals, v)
 		}
 		op, ok := change.Children[0].Value.(int64)
 		if !ok {
@@ -105,11 +105,11 @@ func HandleModifyRequest(ctx context.Context, req *ber.Packet, boundDN string, f
 			Log.Printf("Unrecognized Modify attribute %d", op)
 			return LDAPResultProtocolError
 		case AddAttribute:
-			modReq.Add(attr.AttrType, attr.AttrVals)
+			modReq.Add(attr.Type, attr.Vals)
 		case DeleteAttribute:
-			modReq.Delete(attr.AttrType, attr.AttrVals)
+			modReq.Delete(attr.Type, attr.Vals)
 		case ReplaceAttribute:
-			modReq.Replace(attr.AttrType, attr.AttrVals)
+			modReq.Replace(attr.Type, attr.Vals)
 		}
 	}
 	fnNames := []string{}
@@ -131,7 +131,7 @@ func HandleCompareRequest(ctx context.Context, req *ber.Packet, boundDN string, 
 	}
 	var ok bool
 	compReq := CompareRequest{}
-	compReq.dn, ok = req.Children[0].Value.(string)
+	compReq.DN, ok = req.Children[0].Value.(string)
 	if !ok {
 		return LDAPResultProtocolError
 	}
@@ -139,15 +139,14 @@ func HandleCompareRequest(ctx context.Context, req *ber.Packet, boundDN string, 
 	if len(ava.Children) != 2 {
 		return LDAPResultProtocolError
 	}
-	attr, ok := ava.Children[0].Value.(string)
+	compReq.Attribute, ok = ava.Children[0].Value.(string)
 	if !ok {
 		return LDAPResultProtocolError
 	}
-	val, ok := ava.Children[1].Value.(string)
+	compReq.Value, ok = ava.Children[1].Value.(string)
 	if !ok {
 		return LDAPResultProtocolError
 	}
-	compReq.ava = []AttributeValueAssertion{{attr, val}}
 	fnNames := []string{}
 	for k := range fns {
 		fnNames = append(fnNames, k)
@@ -200,20 +199,20 @@ func HandleModifyDNRequest(ctx context.Context, req *ber.Packet, boundDN string,
 	}
 	var ok bool
 	mdnReq := ModifyDNRequest{}
-	mdnReq.dn, ok = req.Children[0].Value.(string)
+	mdnReq.DN, ok = req.Children[0].Value.(string)
 	if !ok {
 		return LDAPResultProtocolError
 	}
-	mdnReq.newrdn, ok = req.Children[1].Value.(string)
+	mdnReq.NewRDN, ok = req.Children[1].Value.(string)
 	if !ok {
 		return LDAPResultProtocolError
 	}
-	mdnReq.deleteoldrdn, ok = req.Children[2].Value.(bool)
+	mdnReq.DeleteOldRDN, ok = req.Children[2].Value.(bool)
 	if !ok {
 		return LDAPResultProtocolError
 	}
 	if len(req.Children) == 4 {
-		mdnReq.newSuperior, ok = req.Children[3].Value.(string)
+		mdnReq.NewSuperior, ok = req.Children[3].Value.(string)
 		if !ok {
 			return LDAPResultProtocolError
 		}

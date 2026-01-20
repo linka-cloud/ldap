@@ -5,12 +5,10 @@
 package ldap
 
 import (
-	"errors"
 	"fmt"
-	"io/ioutil"
-	"os"
 
 	ber "github.com/go-asn1-ber/asn1-ber"
+	"github.com/go-ldap/ldap/v3"
 )
 
 // LDAP Application Codes
@@ -158,162 +156,27 @@ const (
 
 type LDAPResultCode uint8
 
-type Attribute struct {
-	attrType string
-	attrVals []string
-}
-type AddRequest struct {
-	dn         string
-	attributes []Attribute
-}
-type DeleteRequest struct {
-	dn string
-}
+type (
+	Attribute      = ldap.Attribute
+	AddRequest     = ldap.AddRequest
+	DeleteRequest  = ldap.ModifyRequest
+	CompareRequest = ldap.CompareRequest
+)
+
 type ModifyDNRequest struct {
-	dn           string
-	newrdn       string
-	deleteoldrdn bool
-	newSuperior  string
+	DN           string
+	NewRDN       string
+	DeleteOldRDN bool
+	NewSuperior  string
 }
-type AttributeValueAssertion struct {
-	attributeDesc  string
-	assertionValue string
-}
-type CompareRequest struct {
-	dn  string
-	ava []AttributeValueAssertion
-}
+
 type ExtendedRequest struct {
-	requestName  string
-	requestValue string
-}
-
-// Adds descriptions to an LDAP Response packet for debugging
-func addLDAPDescriptions(packet *ber.Packet) (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = NewError(ErrorDebugging, errors.New("ldap: cannot process packet to add descriptions"))
-		}
-	}()
-	packet.Description = "LDAP Response"
-	packet.Children[0].Description = "Message ID"
-
-	application := packet.Children[1].Tag
-	packet.Children[1].Description = ApplicationMap[application]
-
-	switch application {
-	case ApplicationBindRequest:
-		addRequestDescriptions(packet)
-	case ApplicationBindResponse:
-		addDefaultLDAPResponseDescriptions(packet)
-	case ApplicationUnbindRequest:
-		addRequestDescriptions(packet)
-	case ApplicationSearchRequest:
-		addRequestDescriptions(packet)
-	case ApplicationSearchResultEntry:
-		packet.Children[1].Children[0].Description = "Object Name"
-		packet.Children[1].Children[1].Description = "Attributes"
-		for _, child := range packet.Children[1].Children[1].Children {
-			child.Description = "Attribute"
-			child.Children[0].Description = "Attribute Name"
-			child.Children[1].Description = "Attribute Values"
-			for _, grandchild := range child.Children[1].Children {
-				grandchild.Description = "Attribute Value"
-			}
-		}
-		if len(packet.Children) == 3 {
-			addControlDescriptions(packet.Children[2])
-		}
-	case ApplicationSearchResultDone:
-		addDefaultLDAPResponseDescriptions(packet)
-	case ApplicationModifyRequest:
-		addRequestDescriptions(packet)
-	case ApplicationModifyResponse:
-	case ApplicationAddRequest:
-		addRequestDescriptions(packet)
-	case ApplicationAddResponse:
-	case ApplicationDelRequest:
-		addRequestDescriptions(packet)
-	case ApplicationDelResponse:
-	case ApplicationModifyDNRequest:
-		addRequestDescriptions(packet)
-	case ApplicationModifyDNResponse:
-	case ApplicationCompareRequest:
-		addRequestDescriptions(packet)
-	case ApplicationCompareResponse:
-	case ApplicationAbandonRequest:
-		addRequestDescriptions(packet)
-	case ApplicationSearchResultReference:
-	case ApplicationExtendedRequest:
-		addRequestDescriptions(packet)
-	case ApplicationExtendedResponse:
-	}
-
-	return nil
-}
-
-func addControlDescriptions(packet *ber.Packet) {
-	packet.Description = "Controls"
-	for _, child := range packet.Children {
-		child.Description = "Control"
-		child.Children[0].Description = "Control Type (" + ControlTypeMap[child.Children[0].Value.(string)] + ")"
-		value := child.Children[1]
-		if len(child.Children) == 3 {
-			child.Children[1].Description = "Criticality"
-			value = child.Children[2]
-		}
-		value.Description = "Control Value"
-
-		switch child.Children[0].Value.(string) {
-		case ControlTypePaging:
-			value.Description += " (Paging)"
-			if value.Value != nil {
-				valueChildren := ber.DecodePacket(value.Data.Bytes())
-				value.Data.Truncate(0)
-				value.Value = nil
-				valueChildren.Children[1].Value = valueChildren.Children[1].Data.Bytes()
-				value.AppendChild(valueChildren)
-			}
-			value.Children[0].Description = "Real Search Control Value"
-			value.Children[0].Children[0].Description = "Paging Size"
-			value.Children[0].Children[1].Description = "Cookie"
-		}
-	}
-}
-
-func addRequestDescriptions(packet *ber.Packet) {
-	packet.Description = "LDAP Request"
-	packet.Children[0].Description = "Message ID"
-	packet.Children[1].Description = ApplicationMap[packet.Children[1].Tag]
-	if len(packet.Children) == 3 {
-		addControlDescriptions(packet.Children[2])
-	}
-}
-
-func addDefaultLDAPResponseDescriptions(packet *ber.Packet) {
-	resultCode := packet.Children[1].Children[0].Value.(uint64)
-	packet.Children[1].Children[0].Description = "Result Code (" + LDAPResultCodeMap[LDAPResultCode(resultCode)] + ")"
-	packet.Children[1].Children[1].Description = "Matched DN"
-	packet.Children[1].Children[2].Description = "Error Message"
-	if len(packet.Children[1].Children) > 3 {
-		packet.Children[1].Children[3].Description = "Referral"
-	}
-	if len(packet.Children) == 3 {
-		addControlDescriptions(packet.Children[2])
-	}
+	Name  string
+	Value string
 }
 
 func DebugBinaryFile(fileName string) error {
-	file, err := ioutil.ReadFile(fileName)
-	if err != nil {
-		return NewError(ErrorDebugging, err)
-	}
-	ber.PrintBytes(os.Stdout, file, "")
-	packet := ber.DecodePacket(file)
-	addLDAPDescriptions(packet)
-	ber.PrintPacket(packet)
-
-	return nil
+	return ldap.DebugBinaryFile(fileName)
 }
 
 type Error struct {

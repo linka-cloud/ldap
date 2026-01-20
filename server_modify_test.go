@@ -103,9 +103,9 @@ func (h modifyTestHandler) Bind(ctx context.Context, bindDN, bindSimplePw string
 
 func (h modifyTestHandler) Add(ctx context.Context, boundDN string, req AddRequest, conn net.Conn) (LDAPResultCode, error) {
 	// only succeed on expected contents of add.ldif:
-	if len(req.attributes) == 5 && req.dn == "cn=Barbara Jensen,dc=example,dc=com" &&
-		req.attributes[2].attrType == "sn" && len(req.attributes[2].attrVals) == 1 &&
-		req.attributes[2].attrVals[0] == "Jensen" {
+	if len(req.Attributes) == 5 && req.DN == "cn=Barbara Jensen,dc=example,dc=com" &&
+		req.Attributes[2].Type == "sn" && len(req.Attributes[2].Vals) == 1 &&
+		req.Attributes[2].Vals[0] == "Jensen" {
 		return LDAPResultSuccess, nil
 	}
 	return LDAPResultInsufficientAccessRights, nil
@@ -120,10 +120,11 @@ func (h modifyTestHandler) Delete(ctx context.Context, boundDN, deleteDN string,
 }
 
 func (h modifyTestHandler) Modify(ctx context.Context, boundDN string, req ModifyRequest, conn net.Conn) (LDAPResultCode, error) {
+	add, replace, del := ModifiedAttributes(req)
 	// only succeed on expected contents of modify.ldif:
-	if req.Dn == "cn=testy,dc=example,dc=com" && len(req.AddAttributes) == 1 &&
-		len(req.DeleteAttributes) == 3 && len(req.ReplaceAttributes) == 2 &&
-		req.DeleteAttributes[2].AttrType == "details" && len(req.DeleteAttributes[2].AttrVals) == 0 {
+	if req.DN == "cn=testy,dc=example,dc=com" && len(add) == 1 &&
+		len(del) == 3 && len(replace) == 2 &&
+		del[2].Type == "details" && len(del[2].Vals) == 0 {
 		return LDAPResultSuccess, nil
 	}
 	return LDAPResultInsufficientAccessRights, nil

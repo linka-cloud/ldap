@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	ber "github.com/go-asn1-ber/asn1-ber"
+	"github.com/go-ldap/ldap/v3"
 )
 
 type Binder interface {
@@ -298,7 +299,11 @@ handler:
 		controls := []Control{}
 		if len(packet.Children) > 2 {
 			for _, child := range packet.Children[2].Children {
-				controls = append(controls, DecodeControl(child))
+				if c, err := ldap.DecodeControl(child); err == nil {
+					controls = append(controls, c)
+				} else {
+					Log.Printf("Failed to decode control: %s", err.Error())
+				}
 			}
 		}
 

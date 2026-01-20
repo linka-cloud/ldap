@@ -271,31 +271,31 @@ type searchSimple struct{}
 
 func (s searchSimple) Search(ctx context.Context, boundDN string, searchReq SearchRequest, conn net.Conn) (ServerSearchResult, error) {
 	entries := []*Entry{
-		{"cn=ned,o=testers,c=test", []*EntryAttribute{
-			{"cn", []string{"ned"}},
-			{"o", []string{"ate"}},
-			{"uidNumber", []string{"5000"}},
-			{"accountstatus", []string{"active"}},
-			{"uid", []string{"ned"}},
-			{"description", []string{"ned via sa"}},
-			{"objectclass", []string{"posixaccount"}},
+		{DN: "cn=ned,o=testers,c=test", Attributes: []*EntryAttribute{
+			{Name: "cn", Values: []string{"ned"}},
+			{Name: "o", Values: []string{"ate"}},
+			{Name: "uidNumber", Values: []string{"5000"}},
+			{Name: "accountstatus", Values: []string{"active"}},
+			{Name: "uid", Values: []string{"ned"}},
+			{Name: "description", Values: []string{"ned via sa"}},
+			{Name: "objectclass", Values: []string{"posixaccount"}},
 		}},
-		{"cn=trent,o=testers,c=test", []*EntryAttribute{
-			{"cn", []string{"trent"}},
-			{"o", []string{"ate"}},
-			{"uidNumber", []string{"5005"}},
-			{"accountstatus", []string{"active"}},
-			{"uid", []string{"trent"}},
-			{"description", []string{"trent via sa"}},
-			{"objectclass", []string{"posixaccount"}},
+		{DN: "cn=trent,o=testers,c=test", Attributes: []*EntryAttribute{
+			{Name: "cn", Values: []string{"trent"}},
+			{Name: "o", Values: []string{"ate"}},
+			{Name: "uidNumber", Values: []string{"5005"}},
+			{Name: "accountstatus", Values: []string{"active"}},
+			{Name: "uid", Values: []string{"trent"}},
+			{Name: "description", Values: []string{"trent via sa"}},
+			{Name: "objectclass", Values: []string{"posixaccount"}},
 		}},
-		{"cn=randy,o=testers,c=test", []*EntryAttribute{
-			{"cn", []string{"randy"}},
-			{"o", []string{"ate"}},
-			{"uidNumber", []string{"5555"}},
-			{"accountstatus", []string{"active"}},
-			{"uid", []string{"randy"}},
-			{"objectclass", []string{"posixaccount"}},
+		{DN: "cn=randy,o=testers,c=test", Attributes: []*EntryAttribute{
+			{Name: "cn", Values: []string{"randy"}},
+			{Name: "o", Values: []string{"ate"}},
+			{Name: "uidNumber", Values: []string{"5555"}},
+			{Name: "accountstatus", Values: []string{"active"}},
+			{Name: "uid", Values: []string{"randy"}},
+			{Name: "objectclass", Values: []string{"posixaccount"}},
 		}},
 	}
 	return ServerSearchResult{entries, []string{}, []Control{}, LDAPResultSuccess}, nil
@@ -305,13 +305,13 @@ type searchSimple2 struct{}
 
 func (s searchSimple2) Search(ctx context.Context, boundDN string, searchReq SearchRequest, conn net.Conn) (ServerSearchResult, error) {
 	entries := []*Entry{
-		{"cn=hamburger,o=testers,c=testz", []*EntryAttribute{
-			{"cn", []string{"hamburger"}},
-			{"o", []string{"testers"}},
-			{"uidNumber", []string{"5000"}},
-			{"accountstatus", []string{"active"}},
-			{"uid", []string{"hamburger"}},
-			{"objectclass", []string{"posixaccount"}},
+		{DN: "cn=hamburger,o=testers,c=testz", Attributes: []*EntryAttribute{
+			{Name: "cn", Values: []string{"hamburger"}},
+			{Name: "o", Values: []string{"testers"}},
+			{Name: "uidNumber", Values: []string{"5000"}},
+			{Name: "accountstatus", Values: []string{"active"}},
+			{Name: "uid", Values: []string{"hamburger"}},
+			{Name: "objectclass", Values: []string{"posixaccount"}},
 		}},
 	}
 	return ServerSearchResult{entries, []string{}, []Control{}, LDAPResultSuccess}, nil
@@ -328,13 +328,13 @@ type searchControls struct{}
 func (s searchControls) Search(ctx context.Context, boundDN string, searchReq SearchRequest, conn net.Conn) (ServerSearchResult, error) {
 	entries := []*Entry{}
 	if len(searchReq.Controls) == 1 && searchReq.Controls[0].GetControlType() == "1.2.3.4.5" {
-		newEntry := &Entry{"cn=hamburger,o=testers,c=testz", []*EntryAttribute{
-			{"cn", []string{"hamburger"}},
-			{"o", []string{"testers"}},
-			{"uidNumber", []string{"5000"}},
-			{"accountstatus", []string{"active"}},
-			{"uid", []string{"hamburger"}},
-			{"objectclass", []string{"posixaccount"}},
+		newEntry := &Entry{DN: "cn=hamburger,o=testers,c=testz", Attributes: []*EntryAttribute{
+			{Name: "cn", Values: []string{"hamburger"}},
+			{Name: "o", Values: []string{"testers"}},
+			{Name: "uidNumber", Values: []string{"5000"}},
+			{Name: "accountstatus", Values: []string{"active"}},
+			{Name: "uid", Values: []string{"hamburger"}},
+			{Name: "objectclass", Values: []string{"posixaccount"}},
 		}}
 		entries = append(entries, newEntry)
 	}
@@ -345,14 +345,14 @@ type searchCaseInsensitive struct{}
 
 func (s searchCaseInsensitive) Search(ctx context.Context, boundDN string, searchReq SearchRequest, conn net.Conn) (ServerSearchResult, error) {
 	entries := []*Entry{
-		{"cn=CASE,o=testers,c=test", []*EntryAttribute{
-			{"cn", []string{"CaSe"}},
-			{"o", []string{"ate"}},
-			{"uidNumber", []string{"5005"}},
-			{"accountstatus", []string{"active"}},
-			{"uid", []string{"trent"}},
-			{"description", []string{"trent via sa"}},
-			{"objectclass", []string{"posixaccount"}},
+		{DN: "cn=CASE,o=testers,c=test", Attributes: []*EntryAttribute{
+			{Name: "cn", Values: []string{"CaSe"}},
+			{Name: "o", Values: []string{"ate"}},
+			{Name: "uidNumber", Values: []string{"5005"}},
+			{Name: "accountstatus", Values: []string{"active"}},
+			{Name: "uid", Values: []string{"trent"}},
+			{Name: "description", Values: []string{"trent via sa"}},
+			{Name: "objectclass", Values: []string{"posixaccount"}},
 		}},
 	}
 	return ServerSearchResult{entries, []string{}, []Control{}, LDAPResultSuccess}, nil
