@@ -11,7 +11,7 @@ import (
 type debugging bool
 
 // write debug output
-func (debug debugging) Printf(format string, args ...interface{}) {
+func (debug debugging) Printf(format string, args ...any) {
 	if debug {
 		log.Printf(format, args...)
 	}
