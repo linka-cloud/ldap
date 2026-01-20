@@ -1,13 +1,14 @@
 package ldap
 
 import (
+	"context"
 	"log"
 	"net"
 
 	ber "github.com/go-asn1-ber/asn1-ber"
 )
 
-func HandleBindRequest(req *ber.Packet, fns map[string]Binder, conn net.Conn) (resultCode LDAPResultCode) {
+func HandleBindRequest(ctx context.Context, req *ber.Packet, fns map[string]Binder, conn net.Conn) (resultCode LDAPResultCode) {
 	defer func() {
 		if r := recover(); r != nil {
 			resultCode = LDAPResultOperationsError
@@ -41,7 +42,7 @@ func HandleBindRequest(req *ber.Packet, fns map[string]Binder, conn net.Conn) (r
 				fnNames = append(fnNames, k)
 			}
 			fn := routeFunc(bindDN, fnNames)
-			resultCode, err := fns[fn].Bind(bindDN, bindAuth.Data.String(), conn)
+			resultCode, err := fns[fn].Bind(ctx, bindDN, bindAuth.Data.String(), conn)
 			if err != nil {
 				log.Printf("BindFn Error %s", err.Error())
 				return LDAPResultOperationsError

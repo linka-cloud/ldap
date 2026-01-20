@@ -4,19 +4,20 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net"
 
 	"beryju.io/ldap"
 )
 
-/////////////
+// ///////////
 // Sample searches you can try against this simple LDAP server:
 //
 // ldapsearch -H ldap://localhost:3389 -x -b 'dn=test,dn=com'
 // ldapsearch -H ldap://localhost:3389 -x -b 'dn=test,dn=com' 'cn=ned'
 // ldapsearch -H ldap://localhost:3389 -x -b 'dn=test,dn=com' 'uidnumber=5000'
-/////////////
+// ///////////
 
 // /////////// Run a simple LDAP server
 func main() {
@@ -38,7 +39,7 @@ func main() {
 type ldapHandler struct{}
 
 // /////////// Allow anonymous binds only
-func (h ldapHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.LDAPResultCode, error) {
+func (h ldapHandler) Bind(ctx context.Context, bindDN, bindSimplePw string, conn net.Conn) (ldap.LDAPResultCode, error) {
 	if bindDN == "" && bindSimplePw == "" {
 		return ldap.LDAPResultSuccess, nil
 	}
@@ -46,7 +47,7 @@ func (h ldapHandler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.LDAP
 }
 
 // /////////// Return some hardcoded search results - we'll respond to any baseDN for testing
-func (h ldapHandler) Search(boundDN string, searchReq ldap.SearchRequest, conn net.Conn) (ldap.ServerSearchResult, error) {
+func (h ldapHandler) Search(ctx context.Context, boundDN string, searchReq ldap.SearchRequest, conn net.Conn) (ldap.ServerSearchResult, error) {
 	entries := []*ldap.Entry{
 		{"cn=ned," + searchReq.BaseDN, []*ldap.EntryAttribute{
 			{"cn", []string{"ned"}},

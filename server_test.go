@@ -2,6 +2,7 @@ package ldap
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"log"
 	"net"
@@ -18,19 +19,20 @@ var (
 	serverBaseDN = "o=testers,c=test"
 )
 
-func LaunchWorkerForTest(t *testing.T, worker func(should_quit chan (bool)), test func()) {
-	worker_should_quit := make(chan bool)
+func LaunchWorkerForTest(t *testing.T, worker func(ctx context.Context), test func()) {
+	ctx, cancel := context.WithCancel(t.Context())
 	worker_has_quit := make(chan bool)
 	test_done := make(chan bool)
 
 	go func() {
-		worker(worker_should_quit)
+		worker(ctx)
 		worker_has_quit <- true
 	}()
 
 	// time.Sleep(serverStartDelay)
 
 	go func() {
+		defer cancel()
 		test()
 		test_done <- true
 	}()
@@ -41,17 +43,12 @@ func LaunchWorkerForTest(t *testing.T, worker func(should_quit chan (bool)), tes
 		t.Errorf("test func timed out")
 	}
 
-	select {
-	case worker_should_quit <- true:
-		<-worker_has_quit
-	case <-worker_has_quit:
-	}
+	<-worker_has_quit
 }
 
 func LaunchServerForTest(t *testing.T, s *Server, test func()) {
-	LaunchWorkerForTest(t, func(server_should_quit chan (bool)) {
-		s.QuitChannel(server_should_quit)
-		if err := s.ListenAndServe(listenString); err != nil {
+	LaunchWorkerForTest(t, func(ctx context.Context) {
+		if err := s.ListenAndServeContext(ctx, listenString); err != nil {
 			t.Errorf("s.ListenAndServe failed: %s", err.Error())
 		}
 	}, test)
@@ -137,12 +134,11 @@ func TestBindSimpleFailBadDn(t *testing.T) {
 func TestBindSSL(t *testing.T) {
 	ldapURLSSL := "ldaps://" + listenString
 
-	LaunchWorkerForTest(t, func(server_should_quit chan (bool)) {
+	LaunchWorkerForTest(t, func(ctx context.Context) {
 		// worker: run LDAP server with TLS
 		s := NewServer()
-		s.QuitChannel(server_should_quit)
 		s.BindFunc("", bindAnonOK{})
-		if err := s.ListenAndServeTLS(listenString, "tests/cert_DONOTUSE.pem", "tests/key_DONOTUSE.pem"); err != nil {
+		if err := s.ListenAndServeTLSContext(ctx, listenString, "tests/cert_DONOTUSE.pem", "tests/key_DONOTUSE.pem"); err != nil {
 			t.Errorf("s.ListenAndServeTLS failed: %s", err.Error())
 		}
 	}, func() {
@@ -157,10 +153,9 @@ func TestBindSSL(t *testing.T) {
 }
 
 func TestBindStartTLS(t *testing.T) {
-	LaunchWorkerForTest(t, func(server_should_quit chan (bool)) {
+	LaunchWorkerForTest(t, func(ctx context.Context) {
 		// worker: run LDAP server with STARTTLS
 		s := NewServer()
-		s.QuitChannel(server_should_quit)
 		s.BindFunc("", bindAnonOK{})
 		cert, err := tls.LoadX509KeyPair("tests/cert_DONOTUSE.pem", "tests/key_DONOTUSE.pem")
 		if err != nil {
@@ -169,7 +164,7 @@ func TestBindStartTLS(t *testing.T) {
 		s.StartTLS = &tls.Config{
 			Certificates: []tls.Certificate{cert},
 		}
-		if err := s.ListenAndServe(listenString); err != nil {
+		if err := s.ListenAndServeContext(ctx, listenString); err != nil {
 			t.Errorf("s.ListenAndServeTLS failed: %s", err.Error())
 		}
 	}, func() {
@@ -233,7 +228,7 @@ func TestSearchStats(t *testing.T) {
 // ///////////////////////
 type bindAnonOK struct{}
 
-func (b bindAnonOK) Bind(bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error) {
+func (b bindAnonOK) Bind(ctx context.Context, bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error) {
 	if bindDN == "" && bindSimplePw == "" {
 		return LDAPResultSuccess, nil
 	}
@@ -242,7 +237,7 @@ func (b bindAnonOK) Bind(bindDN, bindSimplePw string, conn net.Conn) (LDAPResult
 
 type bindSimple struct{}
 
-func (b bindSimple) Bind(bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error) {
+func (b bindSimple) Bind(ctx context.Context, bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error) {
 	if bindDN == "cn=testy,o=testers,c=test" && bindSimplePw == "iLike2test" {
 		return LDAPResultSuccess, nil
 	}
@@ -251,7 +246,7 @@ func (b bindSimple) Bind(bindDN, bindSimplePw string, conn net.Conn) (LDAPResult
 
 type bindSimple2 struct{}
 
-func (b bindSimple2) Bind(bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error) {
+func (b bindSimple2) Bind(ctx context.Context, bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error) {
 	if bindDN == "cn=testy,o=testers,c=testz" && bindSimplePw == "ZLike2test" {
 		return LDAPResultSuccess, nil
 	}
@@ -260,13 +255,13 @@ func (b bindSimple2) Bind(bindDN, bindSimplePw string, conn net.Conn) (LDAPResul
 
 type bindPanic struct{}
 
-func (b bindPanic) Bind(bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error) {
+func (b bindPanic) Bind(ctx context.Context, bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error) {
 	panic("test panic at the disco")
 }
 
 type bindCaseInsensitive struct{}
 
-func (b bindCaseInsensitive) Bind(bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error) {
+func (b bindCaseInsensitive) Bind(ctx context.Context, bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error) {
 	if strings.ToLower(bindDN) == "cn=case,o=testers,c=test" && bindSimplePw == "iLike2test" {
 		return LDAPResultSuccess, nil
 	}
@@ -275,7 +270,7 @@ func (b bindCaseInsensitive) Bind(bindDN, bindSimplePw string, conn net.Conn) (L
 
 type searchSimple struct{}
 
-func (s searchSimple) Search(boundDN string, searchReq SearchRequest, conn net.Conn) (ServerSearchResult, error) {
+func (s searchSimple) Search(ctx context.Context, boundDN string, searchReq SearchRequest, conn net.Conn) (ServerSearchResult, error) {
 	entries := []*Entry{
 		{"cn=ned,o=testers,c=test", []*EntryAttribute{
 			{"cn", []string{"ned"}},
@@ -309,7 +304,7 @@ func (s searchSimple) Search(boundDN string, searchReq SearchRequest, conn net.C
 
 type searchSimple2 struct{}
 
-func (s searchSimple2) Search(boundDN string, searchReq SearchRequest, conn net.Conn) (ServerSearchResult, error) {
+func (s searchSimple2) Search(ctx context.Context, boundDN string, searchReq SearchRequest, conn net.Conn) (ServerSearchResult, error) {
 	entries := []*Entry{
 		{"cn=hamburger,o=testers,c=testz", []*EntryAttribute{
 			{"cn", []string{"hamburger"}},
@@ -325,13 +320,13 @@ func (s searchSimple2) Search(boundDN string, searchReq SearchRequest, conn net.
 
 type searchPanic struct{}
 
-func (s searchPanic) Search(boundDN string, searchReq SearchRequest, conn net.Conn) (ServerSearchResult, error) {
+func (s searchPanic) Search(ctx context.Context, boundDN string, searchReq SearchRequest, conn net.Conn) (ServerSearchResult, error) {
 	panic("this is a test panic")
 }
 
 type searchControls struct{}
 
-func (s searchControls) Search(boundDN string, searchReq SearchRequest, conn net.Conn) (ServerSearchResult, error) {
+func (s searchControls) Search(ctx context.Context, boundDN string, searchReq SearchRequest, conn net.Conn) (ServerSearchResult, error) {
 	entries := []*Entry{}
 	if len(searchReq.Controls) == 1 && searchReq.Controls[0].GetControlType() == "1.2.3.4.5" {
 		newEntry := &Entry{"cn=hamburger,o=testers,c=testz", []*EntryAttribute{
@@ -349,7 +344,7 @@ func (s searchControls) Search(boundDN string, searchReq SearchRequest, conn net
 
 type searchCaseInsensitive struct{}
 
-func (s searchCaseInsensitive) Search(boundDN string, searchReq SearchRequest, conn net.Conn) (ServerSearchResult, error) {
+func (s searchCaseInsensitive) Search(ctx context.Context, boundDN string, searchReq SearchRequest, conn net.Conn) (ServerSearchResult, error) {
 	entries := []*Entry{
 		{"cn=CASE,o=testers,c=test", []*EntryAttribute{
 			{"cn", []string{"CaSe"}},

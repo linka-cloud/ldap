@@ -1,6 +1,7 @@
 package ldap
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -9,7 +10,7 @@ import (
 	ber "github.com/go-asn1-ber/asn1-ber"
 )
 
-func HandleSearchRequest(req *ber.Packet, controls *[]Control, messageID uint64, boundDN string, server *Server, conn net.Conn) (resultErr error) {
+func HandleSearchRequest(ctx context.Context, req *ber.Packet, controls *[]Control, messageID uint64, boundDN string, server *Server, conn net.Conn) (resultErr error) {
 	defer func() {
 		if r := recover(); r != nil {
 			resultErr = NewError(LDAPResultOperationsError, fmt.Errorf("Search function panic: %s", r))
@@ -31,7 +32,7 @@ func HandleSearchRequest(req *ber.Packet, controls *[]Control, messageID uint64,
 		fnNames = append(fnNames, k)
 	}
 	fn := routeFunc(searchReq.BaseDN, fnNames)
-	searchResp, err := server.SearchFns[fn].Search(boundDN, searchReq, conn)
+	searchResp, err := server.SearchFns[fn].Search(ctx, boundDN, searchReq, conn)
 	if err != nil {
 		return NewError(searchResp.ResultCode, err)
 	}
