@@ -8,7 +8,7 @@ import (
 	"log"
 	"net"
 
-	"beryju.io/ldap"
+	"go.linka.cloud/ldap"
 )
 
 // ///////////

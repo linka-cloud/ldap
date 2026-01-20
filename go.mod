@@ -1,4 +1,4 @@
-module beryju.io/ldap
+module go.linka.cloud/ldap
 
 go 1.25
 
