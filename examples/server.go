@@ -22,6 +22,7 @@ import (
 // /////////// Run a simple LDAP server
 func main() {
 	s := ldap.NewServer()
+	s.EnforceLDAP = true
 
 	// register Bind and Search function handlers
 	handler := ldapHandler{}

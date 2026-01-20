@@ -253,7 +253,7 @@ func compileFilter(filter string, pos int) (*ber.Packet, int, error) {
 func ServerApplyFilter(f *ber.Packet, entry *Entry) (bool, LDAPResultCode) {
 	switch FilterMap[f.Tag] {
 	default:
-		// log.Fatalf("Unknown LDAP filter code: %d", f.Tag)
+		// Log.Fatalf("Unknown LDAP filter code: %d", f.Tag)
 		return false, LDAPResultOperationsError
 	case "Equality Match":
 		if len(f.Children) != 2 {

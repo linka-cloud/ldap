@@ -1,8 +1,6 @@
 package ldap
 
 import (
-	"log"
-
 	ber "github.com/go-asn1-ber/asn1-ber"
 )
 
@@ -13,7 +11,7 @@ type debugging bool
 // write debug output
 func (debug debugging) Printf(format string, args ...any) {
 	if debug {
-		log.Printf(format, args...)
+		Log.Printf(format, args...)
 	}
 }
 

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
-	"log"
 	"net"
 	"os/exec"
 	"strings"
@@ -203,7 +202,7 @@ func (tsw testStatsWriter) Write(buf []byte) (int, error) {
 
 func TestSearchStats(t *testing.T) {
 	w := testStatsWriter{&bytes.Buffer{}}
-	log.SetOutput(w)
+	Log.SetOutput(w)
 
 	s := NewServer()
 	s.SearchFunc("", searchSimple{})
@@ -219,7 +218,7 @@ func TestSearchStats(t *testing.T) {
 	})
 
 	stats := s.GetStats()
-	log.Println(stats)
+	Log.Print(stats)
 	if stats.Conns != 1 || stats.Binds != 1 {
 		t.Errorf("Stats data missing or incorrect: %v", w.buffer.String())
 	}

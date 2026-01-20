@@ -2,7 +2,6 @@ package ldap
 
 import (
 	"context"
-	"log"
 	"net"
 
 	ber "github.com/go-asn1-ber/asn1-ber"
@@ -21,7 +20,7 @@ func HandleBindRequest(ctx context.Context, req *ber.Packet, fns map[string]Bind
 		return LDAPResultProtocolError
 	}
 	if ldapVersion != 3 {
-		log.Printf("Unsupported LDAP version: %d", ldapVersion)
+		Log.Printf("Unsupported LDAP version: %d", ldapVersion)
 		return LDAPResultInappropriateAuthentication
 	}
 
@@ -33,7 +32,7 @@ func HandleBindRequest(ctx context.Context, req *ber.Packet, fns map[string]Bind
 	bindAuth := req.Children[2]
 	switch bindAuth.Tag {
 	default:
-		log.Print("Unknown LDAP authentication method")
+		Log.Print("Unknown LDAP authentication method")
 		return LDAPResultInappropriateAuthentication
 	case LDAPBindAuthSimple:
 		if len(req.Children) == 3 {
@@ -44,16 +43,16 @@ func HandleBindRequest(ctx context.Context, req *ber.Packet, fns map[string]Bind
 			fn := routeFunc(bindDN, fnNames)
 			resultCode, err := fns[fn].Bind(ctx, bindDN, bindAuth.Data.String(), conn)
 			if err != nil {
-				log.Printf("BindFn Error %s", err.Error())
+				Log.Printf("BindFn Error %s", err.Error())
 				return LDAPResultOperationsError
 			}
 			return resultCode
 		} else {
-			log.Print("Simple bind request has wrong # children.  len(req.Children) != 3")
+			Log.Print("Simple bind request has wrong # children.  len(req.Children) != 3")
 			return LDAPResultInappropriateAuthentication
 		}
 	case LDAPBindAuthSASL:
-		log.Print("SASL authentication is not supported")
+		Log.Print("SASL authentication is not supported")
 		return LDAPResultInappropriateAuthentication
 	}
 }

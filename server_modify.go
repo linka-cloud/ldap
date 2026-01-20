@@ -2,7 +2,6 @@ package ldap
 
 import (
 	"context"
-	"log"
 	"net"
 
 	ber "github.com/go-asn1-ber/asn1-ber"
@@ -46,7 +45,7 @@ func HandleAddRequest(ctx context.Context, req *ber.Packet, boundDN string, fns 
 	fn := routeFunc(boundDN, fnNames)
 	resultCode, err := fns[fn].Add(ctx, boundDN, addReq, conn)
 	if err != nil {
-		log.Printf("AddFn Error %s", err.Error())
+		Log.Printf("AddFn Error %s", err.Error())
 		return LDAPResultOperationsError
 	}
 	return resultCode
@@ -61,7 +60,7 @@ func HandleDeleteRequest(ctx context.Context, req *ber.Packet, boundDN string, f
 	fn := routeFunc(boundDN, fnNames)
 	resultCode, err := fns[fn].Delete(ctx, boundDN, deleteDN, conn)
 	if err != nil {
-		log.Printf("DeleteFn Error %s", err.Error())
+		Log.Printf("DeleteFn Error %s", err.Error())
 		return LDAPResultOperationsError
 	}
 	return resultCode
@@ -103,7 +102,7 @@ func HandleModifyRequest(ctx context.Context, req *ber.Packet, boundDN string, f
 		}
 		switch op {
 		default:
-			log.Printf("Unrecognized Modify attribute %d", op)
+			Log.Printf("Unrecognized Modify attribute %d", op)
 			return LDAPResultProtocolError
 		case AddAttribute:
 			modReq.Add(attr.AttrType, attr.AttrVals)
@@ -120,7 +119,7 @@ func HandleModifyRequest(ctx context.Context, req *ber.Packet, boundDN string, f
 	fn := routeFunc(boundDN, fnNames)
 	resultCode, err := fns[fn].Modify(ctx, boundDN, modReq, conn)
 	if err != nil {
-		log.Printf("ModifyFn Error %s", err.Error())
+		Log.Printf("ModifyFn Error %s", err.Error())
 		return LDAPResultOperationsError
 	}
 	return resultCode
@@ -156,7 +155,7 @@ func HandleCompareRequest(ctx context.Context, req *ber.Packet, boundDN string, 
 	fn := routeFunc(boundDN, fnNames)
 	resultCode, err := fns[fn].Compare(ctx, boundDN, compReq, conn)
 	if err != nil {
-		log.Printf("CompareFn Error %s", err.Error())
+		Log.Printf("CompareFn Error %s", err.Error())
 		return LDAPResultOperationsError
 	}
 	return resultCode
@@ -179,7 +178,7 @@ func HandleExtendedRequest(ctx context.Context, req *ber.Packet, boundDN string,
 	fn := routeFunc(boundDN, fnNames)
 	resultCode, err := fns[fn].Extended(ctx, boundDN, extReq, conn)
 	if err != nil {
-		log.Printf("ExtendedFn Error %s", err.Error())
+		Log.Printf("ExtendedFn Error %s", err.Error())
 		return LDAPResultOperationsError
 	}
 	return resultCode
@@ -226,7 +225,7 @@ func HandleModifyDNRequest(ctx context.Context, req *ber.Packet, boundDN string,
 	fn := routeFunc(boundDN, fnNames)
 	resultCode, err := fns[fn].ModifyDN(ctx, boundDN, mdnReq, conn)
 	if err != nil {
-		log.Printf("ModifyDN Error %s", err.Error())
+		Log.Printf("ModifyDN Error %s", err.Error())
 		return LDAPResultOperationsError
 	}
 	return resultCode
