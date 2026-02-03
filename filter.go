@@ -351,58 +351,66 @@ func ServerApplyFilter(f *ber.Packet, entry *Entry) (bool, LDAPResultCode) {
 	return false, LDAPResultSuccess
 }
 
-func GetFilterObjectClass(filter string) (string, error) {
+func GetFilterObjectClass(filter string) ([]string, error) {
 	f, err := CompileFilter(filter)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	return parseFilterObjectClass(f)
 }
 
-func parseFilterObjectClass(f *ber.Packet) (string, error) {
-	objectClass := ""
+func parseFilterObjectClass(f *ber.Packet) ([]string, error) {
+	var objectClass []string
 	switch FilterMap[f.Tag] {
 	case "Equality Match":
 		if len(f.Children) != 2 {
-			return "", errors.New("Equality match must have only two children")
+			return nil, errors.New("Equality match must have only two children")
 		}
 		attribute := strings.ToLower(f.Children[0].Value.(string))
 		value := f.Children[1].Value.(string)
 		if attribute == "objectclass" {
-			objectClass = strings.ToLower(value)
+			objectClass = append(objectClass, strings.ToLower(value))
 		}
 	case "And":
 		for _, child := range f.Children {
 			subType, err := parseFilterObjectClass(child)
 			if err != nil {
-				return "", err
+				return nil, err
 			}
 			if len(subType) > 0 {
-				objectClass = subType
+				objectClass = append(objectClass, subType...)
 			}
 		}
 	case "Or":
 		for _, child := range f.Children {
 			subType, err := parseFilterObjectClass(child)
 			if err != nil {
-				return "", err
+				return nil, err
 			}
 			if len(subType) > 0 {
-				objectClass = subType
+				objectClass = append(objectClass, subType...)
 			}
 		}
 	case "Not":
 		if len(f.Children) != 1 {
-			return "", errors.New("Not filter must have only one child")
+			return nil, errors.New("Not filter must have only one child")
 		}
 		subType, err := parseFilterObjectClass(f.Children[0])
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		if len(subType) > 0 {
-			objectClass = subType
+			objectClass = append(objectClass, subType...)
 		}
 
 	}
-	return strings.ToLower(objectClass), nil
+	m := make(map[string]struct{})
+	for _, s := range objectClass {
+		m[s] = struct{}{}
+	}
+	objectClass = []string{}
+	for s := range m {
+		objectClass = append(objectClass, s)
+	}
+	return objectClass, nil
 }

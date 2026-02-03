@@ -113,25 +113,39 @@ func BenchmarkFilterDecompile(b *testing.B) {
 }
 
 func TestGetFilterObjectClass(t *testing.T) {
-	c, err := GetFilterObjectClass("(objectClass=*)")
+	cs, err := GetFilterObjectClass("(objectClass=*)")
 	if err != nil {
 		t.Errorf("GetFilterObjectClass failed")
 	}
-	if c != "" {
+	if len(cs) != 0 {
 		t.Errorf("GetFilterObjectClass failed")
 	}
-	c, err = GetFilterObjectClass("(objectClass=posixAccount)")
+	cs, err = GetFilterObjectClass("(objectClass=posixAccount)")
 	if err != nil {
 		t.Errorf("GetFilterObjectClass failed")
 	}
-	if c != "posixaccount" {
+	if len(cs) != 1 && cs[0] != "posixaccount" {
 		t.Errorf("GetFilterObjectClass failed")
 	}
-	c, err = GetFilterObjectClass("(&(cn=awesome)(objectClass=posixGroup))")
+	cs, err = GetFilterObjectClass("(&(cn=awesome)(objectClass=posixGroup))")
 	if err != nil {
 		t.Errorf("GetFilterObjectClass failed")
 	}
-	if c != "posixgroup" {
+	if len(cs) != 1 && cs[0] != "posixgroup" {
+		t.Errorf("GetFilterObjectClass failed")
+	}
+	cs, err = GetFilterObjectClass("(|(objectClass=user)(objectClass=group))")
+	if err != nil {
+		t.Errorf("GetFilterObjectClass failed")
+	}
+	if len(cs) != 2 || cs[0] != "user" || cs[1] != "group" {
+		t.Errorf("GetFilterObjectClass failed")
+	}
+	cs, err = GetFilterObjectClass("(|(objectClass=user)(objectClass=group)(objectClass=user))")
+	if err != nil {
+		t.Errorf("GetFilterObjectClass failed")
+	}
+	if len(cs) != 2 || cs[0] != "user" || cs[1] != "group" {
 		t.Errorf("GetFilterObjectClass failed")
 	}
 }

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
-	"net"
 	"os/exec"
 	"strings"
 	"testing"
@@ -227,49 +226,49 @@ func TestSearchStats(t *testing.T) {
 // ///////////////////////
 type bindAnonOK struct{}
 
-func (b bindAnonOK) Bind(ctx context.Context, bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error) {
+func (b bindAnonOK) Bind(ctx context.Context, bindDN, bindSimplePw string) (LDAPResultCode, context.Context, error) {
 	if bindDN == "" && bindSimplePw == "" {
-		return LDAPResultSuccess, nil
+		return LDAPResultSuccess, ctx, nil
 	}
-	return LDAPResultInvalidCredentials, nil
+	return LDAPResultInvalidCredentials, ctx, nil
 }
 
 type bindSimple struct{}
 
-func (b bindSimple) Bind(ctx context.Context, bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error) {
+func (b bindSimple) Bind(ctx context.Context, bindDN, bindSimplePw string) (LDAPResultCode, context.Context, error) {
 	if bindDN == "cn=testy,o=testers,c=test" && bindSimplePw == "iLike2test" {
-		return LDAPResultSuccess, nil
+		return LDAPResultSuccess, ctx, nil
 	}
-	return LDAPResultInvalidCredentials, nil
+	return LDAPResultInvalidCredentials, ctx, nil
 }
 
 type bindSimple2 struct{}
 
-func (b bindSimple2) Bind(ctx context.Context, bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error) {
+func (b bindSimple2) Bind(ctx context.Context, bindDN, bindSimplePw string) (LDAPResultCode, context.Context, error) {
 	if bindDN == "cn=testy,o=testers,c=testz" && bindSimplePw == "ZLike2test" {
-		return LDAPResultSuccess, nil
+		return LDAPResultSuccess, ctx, nil
 	}
-	return LDAPResultInvalidCredentials, nil
+	return LDAPResultInvalidCredentials, ctx, nil
 }
 
 type bindPanic struct{}
 
-func (b bindPanic) Bind(ctx context.Context, bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error) {
+func (b bindPanic) Bind(ctx context.Context, bindDN, bindSimplePw string) (LDAPResultCode, context.Context, error) {
 	panic("test panic at the disco")
 }
 
 type bindCaseInsensitive struct{}
 
-func (b bindCaseInsensitive) Bind(ctx context.Context, bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error) {
+func (b bindCaseInsensitive) Bind(ctx context.Context, bindDN, bindSimplePw string) (LDAPResultCode, context.Context, error) {
 	if strings.ToLower(bindDN) == "cn=case,o=testers,c=test" && bindSimplePw == "iLike2test" {
-		return LDAPResultSuccess, nil
+		return LDAPResultSuccess, ctx, nil
 	}
-	return LDAPResultInvalidCredentials, nil
+	return LDAPResultInvalidCredentials, ctx, nil
 }
 
 type searchSimple struct{}
 
-func (s searchSimple) Search(ctx context.Context, boundDN string, searchReq SearchRequest, conn net.Conn) (ServerSearchResult, error) {
+func (s searchSimple) Search(ctx context.Context, searchReq SearchRequest) (ServerSearchResult, error) {
 	entries := []*Entry{
 		{DN: "cn=ned,o=testers,c=test", Attributes: []*EntryAttribute{
 			{Name: "cn", Values: []string{"ned"}},
@@ -303,7 +302,7 @@ func (s searchSimple) Search(ctx context.Context, boundDN string, searchReq Sear
 
 type searchSimple2 struct{}
 
-func (s searchSimple2) Search(ctx context.Context, boundDN string, searchReq SearchRequest, conn net.Conn) (ServerSearchResult, error) {
+func (s searchSimple2) Search(ctx context.Context, searchReq SearchRequest) (ServerSearchResult, error) {
 	entries := []*Entry{
 		{DN: "cn=hamburger,o=testers,c=testz", Attributes: []*EntryAttribute{
 			{Name: "cn", Values: []string{"hamburger"}},
@@ -319,13 +318,13 @@ func (s searchSimple2) Search(ctx context.Context, boundDN string, searchReq Sea
 
 type searchPanic struct{}
 
-func (s searchPanic) Search(ctx context.Context, boundDN string, searchReq SearchRequest, conn net.Conn) (ServerSearchResult, error) {
+func (s searchPanic) Search(ctx context.Context, searchReq SearchRequest) (ServerSearchResult, error) {
 	panic("this is a test panic")
 }
 
 type searchControls struct{}
 
-func (s searchControls) Search(ctx context.Context, boundDN string, searchReq SearchRequest, conn net.Conn) (ServerSearchResult, error) {
+func (s searchControls) Search(ctx context.Context, searchReq SearchRequest) (ServerSearchResult, error) {
 	entries := []*Entry{}
 	if len(searchReq.Controls) == 1 && searchReq.Controls[0].GetControlType() == "1.2.3.4.5" {
 		newEntry := &Entry{DN: "cn=hamburger,o=testers,c=testz", Attributes: []*EntryAttribute{
@@ -343,7 +342,7 @@ func (s searchControls) Search(ctx context.Context, boundDN string, searchReq Se
 
 type searchCaseInsensitive struct{}
 
-func (s searchCaseInsensitive) Search(ctx context.Context, boundDN string, searchReq SearchRequest, conn net.Conn) (ServerSearchResult, error) {
+func (s searchCaseInsensitive) Search(ctx context.Context, searchReq SearchRequest) (ServerSearchResult, error) {
 	entries := []*Entry{
 		{DN: "cn=CASE,o=testers,c=test", Attributes: []*EntryAttribute{
 			{Name: "cn", Values: []string{"CaSe"}},

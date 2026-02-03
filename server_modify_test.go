@@ -2,7 +2,6 @@ package ldap
 
 import (
 	"context"
-	"net"
 	"os/exec"
 	"strings"
 	"testing"
@@ -94,14 +93,14 @@ func TestModifyDN(t *testing.T) {
 
 type modifyTestHandler struct{}
 
-func (h modifyTestHandler) Bind(ctx context.Context, bindDN, bindSimplePw string, conn net.Conn) (LDAPResultCode, error) {
+func (h modifyTestHandler) Bind(ctx context.Context, bindDN, bindSimplePw string) (LDAPResultCode, context.Context, error) {
 	if bindDN == "" && bindSimplePw == "" {
-		return LDAPResultSuccess, nil
+		return LDAPResultSuccess, ctx, nil
 	}
-	return LDAPResultInvalidCredentials, nil
+	return LDAPResultInvalidCredentials, ctx, nil
 }
 
-func (h modifyTestHandler) Add(ctx context.Context, boundDN string, req AddRequest, conn net.Conn) (LDAPResultCode, error) {
+func (h modifyTestHandler) Add(ctx context.Context, req AddRequest) (LDAPResultCode, error) {
 	// only succeed on expected contents of add.ldif:
 	if len(req.Attributes) == 5 && req.DN == "cn=Barbara Jensen,dc=example,dc=com" &&
 		req.Attributes[2].Type == "sn" && len(req.Attributes[2].Vals) == 1 &&
@@ -111,7 +110,7 @@ func (h modifyTestHandler) Add(ctx context.Context, boundDN string, req AddReque
 	return LDAPResultInsufficientAccessRights, nil
 }
 
-func (h modifyTestHandler) Delete(ctx context.Context, boundDN, deleteDN string, conn net.Conn) (LDAPResultCode, error) {
+func (h modifyTestHandler) Delete(ctx context.Context, deleteDN string) (LDAPResultCode, error) {
 	// only succeed on expected deleteDN
 	if deleteDN == "cn=Delete Me,dc=example,dc=com" {
 		return LDAPResultSuccess, nil
@@ -119,7 +118,7 @@ func (h modifyTestHandler) Delete(ctx context.Context, boundDN, deleteDN string,
 	return LDAPResultInsufficientAccessRights, nil
 }
 
-func (h modifyTestHandler) Modify(ctx context.Context, boundDN string, req ModifyRequest, conn net.Conn) (LDAPResultCode, error) {
+func (h modifyTestHandler) Modify(ctx context.Context, req ModifyRequest) (LDAPResultCode, error) {
 	add, replace, del := ModifiedAttributes(req)
 	// only succeed on expected contents of modify.ldif:
 	if req.DN == "cn=testy,dc=example,dc=com" && len(add) == 1 &&
@@ -130,6 +129,6 @@ func (h modifyTestHandler) Modify(ctx context.Context, boundDN string, req Modif
 	return LDAPResultInsufficientAccessRights, nil
 }
 
-func (h modifyTestHandler) ModifyDN(ctx context.Context, boundDN string, req ModifyDNRequest, conn net.Conn) (LDAPResultCode, error) {
+func (h modifyTestHandler) ModifyDN(ctx context.Context, req ModifyDNRequest) (LDAPResultCode, error) {
 	return LDAPResultInsufficientAccessRights, nil
 }
