@@ -370,11 +370,11 @@ func (server *Server) handleRequest(ctx context.Context, req *ber.Packet, conn n
 		if err := HandleSearchRequest(ctx, req, &controls, messageID, server, conn); err != nil {
 			Log.Printf("handleSearchRequest error %s", err.Error()) // TODO: make this more testable/better err handling - stop using Log, stop using breaks?
 			e := err.(*Error)
-			if err = sendPacket(conn, encodeSearchDone(messageID, e.ResultCode)); err != nil {
+			if err = sendPacket(conn, encodeSearchDone(messageID, e.ResultCode, e.Err)); err != nil {
 				Log.Printf("sendPacket error %s", err.Error())
 			}
 		} else {
-			if err = sendPacket(conn, encodeSearchDone(messageID, LDAPResultSuccess)); err != nil {
+			if err = sendPacket(conn, encodeSearchDone(messageID, LDAPResultSuccess, nil)); err != nil {
 				Log.Printf("sendPacket error %s", err.Error())
 			}
 		}

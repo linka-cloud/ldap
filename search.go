@@ -23,3 +23,7 @@ type (
 	SearchResult   = ldap.SearchResult
 	SearchRequest  = ldap.SearchRequest
 )
+
+func NewEntry(dn string, attributes map[string][]string) *Entry {
+	return ldap.NewEntry(dn, attributes)
+}
