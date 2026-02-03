@@ -2,12 +2,11 @@ package ldap
 
 import (
 	"context"
-	"net"
 
 	ber "github.com/go-asn1-ber/asn1-ber"
 )
 
-func HandleBindRequest(ctx context.Context, req *ber.Packet, fns map[string]Binder, conn net.Conn) (resultCode LDAPResultCode) {
+func HandleBindRequest(ctx context.Context, req *ber.Packet, fns map[string]Binder) (resultCode LDAPResultCode, rctx context.Context) {
 	defer func() {
 		if r := recover(); r != nil {
 			resultCode = LDAPResultOperationsError
@@ -17,23 +16,23 @@ func HandleBindRequest(ctx context.Context, req *ber.Packet, fns map[string]Bind
 	// we only support ldapv3
 	ldapVersion, ok := req.Children[0].Value.(int64)
 	if !ok {
-		return LDAPResultProtocolError
+		return LDAPResultProtocolError, ctx
 	}
 	if ldapVersion != 3 {
 		Log.Printf("Unsupported LDAP version: %d", ldapVersion)
-		return LDAPResultInappropriateAuthentication
+		return LDAPResultInappropriateAuthentication, ctx
 	}
 
 	// auth types
 	bindDN, ok := req.Children[1].Value.(string)
 	if !ok {
-		return LDAPResultProtocolError
+		return LDAPResultProtocolError, ctx
 	}
 	bindAuth := req.Children[2]
 	switch bindAuth.Tag {
 	default:
 		Log.Print("Unknown LDAP authentication method")
-		return LDAPResultInappropriateAuthentication
+		return LDAPResultInappropriateAuthentication, ctx
 	case LDAPBindAuthSimple:
 		if len(req.Children) == 3 {
 			fnNames := []string{}
@@ -41,19 +40,19 @@ func HandleBindRequest(ctx context.Context, req *ber.Packet, fns map[string]Bind
 				fnNames = append(fnNames, k)
 			}
 			fn := routeFunc(bindDN, fnNames)
-			resultCode, err := fns[fn].Bind(ctx, bindDN, bindAuth.Data.String(), conn)
+			resultCode, rctx, err := fns[fn].Bind(ctx, bindDN, bindAuth.Data.String())
 			if err != nil {
 				Log.Printf("BindFn Error %s", err.Error())
-				return LDAPResultOperationsError
+				return LDAPResultOperationsError, ctx
 			}
-			return resultCode
+			return resultCode, rctx
 		} else {
 			Log.Print("Simple bind request has wrong # children.  len(req.Children) != 3")
-			return LDAPResultInappropriateAuthentication
+			return LDAPResultInappropriateAuthentication, ctx
 		}
 	case LDAPBindAuthSASL:
 		Log.Print("SASL authentication is not supported")
-		return LDAPResultInappropriateAuthentication
+		return LDAPResultInappropriateAuthentication, ctx
 	}
 }
 

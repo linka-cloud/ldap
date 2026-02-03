@@ -2,12 +2,14 @@ package ldap
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net"
 
 	ber "github.com/go-asn1-ber/asn1-ber"
 )
 
-func HandleAddRequest(ctx context.Context, req *ber.Packet, boundDN string, fns map[string]Adder, conn net.Conn) (resultCode LDAPResultCode) {
+func HandleAddRequest(ctx context.Context, req *ber.Packet, fns map[string]Adder) (resultCode LDAPResultCode) {
 	if len(req.Children) != 2 {
 		return LDAPResultProtocolError
 	}
@@ -42,8 +44,8 @@ func HandleAddRequest(ctx context.Context, req *ber.Packet, boundDN string, fns 
 	for k := range fns {
 		fnNames = append(fnNames, k)
 	}
-	fn := routeFunc(boundDN, fnNames)
-	resultCode, err := fns[fn].Add(ctx, boundDN, addReq, conn)
+	fn := routeFunc(addReq.DN, fnNames)
+	resultCode, err := fns[fn].Add(ctx, addReq)
 	if err != nil {
 		Log.Printf("AddFn Error %s", err.Error())
 		return LDAPResultOperationsError
@@ -51,14 +53,14 @@ func HandleAddRequest(ctx context.Context, req *ber.Packet, boundDN string, fns 
 	return resultCode
 }
 
-func HandleDeleteRequest(ctx context.Context, req *ber.Packet, boundDN string, fns map[string]Deleter, conn net.Conn) (resultCode LDAPResultCode) {
+func HandleDeleteRequest(ctx context.Context, req *ber.Packet, fns map[string]Deleter) (resultCode LDAPResultCode) {
 	deleteDN := ber.DecodeString(req.Data.Bytes())
 	fnNames := []string{}
 	for k := range fns {
 		fnNames = append(fnNames, k)
 	}
-	fn := routeFunc(boundDN, fnNames)
-	resultCode, err := fns[fn].Delete(ctx, boundDN, deleteDN, conn)
+	fn := routeFunc(deleteDN, fnNames)
+	resultCode, err := fns[fn].Delete(ctx, deleteDN)
 	if err != nil {
 		Log.Printf("DeleteFn Error %s", err.Error())
 		return LDAPResultOperationsError
@@ -66,7 +68,7 @@ func HandleDeleteRequest(ctx context.Context, req *ber.Packet, boundDN string, f
 	return resultCode
 }
 
-func HandleModifyRequest(ctx context.Context, req *ber.Packet, boundDN string, fns map[string]Modifier, conn net.Conn) (resultCode LDAPResultCode) {
+func HandleModifyRequest(ctx context.Context, req *ber.Packet, fns map[string]Modifier) (resultCode LDAPResultCode) {
 	if len(req.Children) != 2 {
 		return LDAPResultProtocolError
 	}
@@ -116,8 +118,8 @@ func HandleModifyRequest(ctx context.Context, req *ber.Packet, boundDN string, f
 	for k := range fns {
 		fnNames = append(fnNames, k)
 	}
-	fn := routeFunc(boundDN, fnNames)
-	resultCode, err := fns[fn].Modify(ctx, boundDN, modReq, conn)
+	fn := routeFunc(modReq.DN, fnNames)
+	resultCode, err := fns[fn].Modify(ctx, modReq)
 	if err != nil {
 		Log.Printf("ModifyFn Error %s", err.Error())
 		return LDAPResultOperationsError
@@ -125,7 +127,7 @@ func HandleModifyRequest(ctx context.Context, req *ber.Packet, boundDN string, f
 	return resultCode
 }
 
-func HandleCompareRequest(ctx context.Context, req *ber.Packet, boundDN string, fns map[string]Comparer, conn net.Conn) (resultCode LDAPResultCode) {
+func HandleCompareRequest(ctx context.Context, req *ber.Packet, fns map[string]Comparer) (resultCode LDAPResultCode) {
 	if len(req.Children) != 2 {
 		return LDAPResultProtocolError
 	}
@@ -151,8 +153,8 @@ func HandleCompareRequest(ctx context.Context, req *ber.Packet, boundDN string, 
 	for k := range fns {
 		fnNames = append(fnNames, k)
 	}
-	fn := routeFunc(boundDN, fnNames)
-	resultCode, err := fns[fn].Compare(ctx, boundDN, compReq, conn)
+	fn := routeFunc(compReq.DN, fnNames)
+	resultCode, err := fns[fn].Compare(ctx, compReq)
 	if err != nil {
 		Log.Printf("CompareFn Error %s", err.Error())
 		return LDAPResultOperationsError
@@ -160,40 +162,68 @@ func HandleCompareRequest(ctx context.Context, req *ber.Packet, boundDN string, 
 	return resultCode
 }
 
-func HandleExtendedRequest(ctx context.Context, req *ber.Packet, boundDN string, fns map[string]Extender, conn net.Conn) (resultCode LDAPResultCode) {
+func HandleExtendedRequest(ctx context.Context, req *ber.Packet, controls []Control, fns map[string]Extender, conn net.Conn, messageID uint64) (resultErr error) {
+	defer func() {
+		if r := recover(); r != nil {
+			resultErr = NewError(LDAPResultOperationsError, fmt.Errorf("Extended function panic: %s", r))
+		}
+	}()
+
 	if len(req.Children) != 1 && len(req.Children) != 2 {
-		return LDAPResultProtocolError
+		return NewError(LDAPResultProtocolError, errors.New("Bad extended request"))
 	}
 	name := ber.DecodeString(req.Children[0].Data.Bytes())
-	var val string
+	var val *ber.Packet
 	if len(req.Children) == 2 {
-		val = ber.DecodeString(req.Children[1].Data.Bytes())
+		val = req.Children[1]
 	}
-	extReq := ExtendedRequest{name, val}
+	extReq := ExtendedRequest{name, val, controls}
 	fnNames := []string{}
 	for k := range fns {
 		fnNames = append(fnNames, k)
 	}
-	fn := routeFunc(boundDN, fnNames)
-	resultCode, err := fns[fn].Extended(ctx, boundDN, extReq, conn)
+	fn := routeFunc("", fnNames)
+	res, err := fns[fn].Extended(ctx, extReq)
 	if err != nil {
 		Log.Printf("ExtendedFn Error %s", err.Error())
-		return LDAPResultOperationsError
+		return NewError(LDAPResultOperationsError, err)
 	}
-	return resultCode
+	responsePacket := encodeExtendedResponse(messageID, name, res)
+	if err := sendPacket(conn, responsePacket); err != nil {
+		Log.Printf("sendPacket error %s", err.Error())
+		return NewError(LDAPResultOperationsError, err)
+	}
+
+	return nil
 }
 
-func HandleAbandonRequest(ctx context.Context, req *ber.Packet, boundDN string, fns map[string]Abandoner, conn net.Conn) error {
-	fnNames := []string{}
-	for k := range fns {
-		fnNames = append(fnNames, k)
+func encodeExtendedResponse(messageID uint64, requestName string, res ExtendedResponse) *ber.Packet {
+	responsePacket := ber.Encode(ber.ClassUniversal, ber.TypeConstructed, ber.TagSequence, nil, "LDAP Response")
+	responsePacket.AppendChild(ber.NewInteger(ber.ClassUniversal, ber.TypePrimitive, ber.TagInteger, messageID, "Message ID"))
+	response := ber.Encode(ber.ClassApplication, ber.TypeConstructed, ber.Tag(ApplicationExtendedResponse), nil, ApplicationMap[ApplicationExtendedResponse])
+	response.AppendChild(ber.NewInteger(ber.ClassUniversal, ber.TypePrimitive, ber.TagEnumerated, uint64(res.ResultCode), "resultCode: "))
+	response.AppendChild(ber.NewString(ber.ClassUniversal, ber.TypePrimitive, ber.TagOctetString, "", "matchedDN: "))
+	response.AppendChild(ber.NewString(ber.ClassUniversal, ber.TypePrimitive, ber.TagOctetString, LDAPResultCodeMap[res.ResultCode], "errorMessage: "))
+	responseName := res.Name
+	if responseName == "" {
+		responseName = requestName
 	}
-	fn := routeFunc(boundDN, fnNames)
-	err := fns[fn].Abandon(ctx, boundDN, conn)
-	return err
+	response.AppendChild(ber.NewString(ber.ClassContext, ber.TypePrimitive, 10, responseName, "responseName: "))
+	if res.Value != nil {
+		if res.Value.ClassType == ber.ClassContext && res.Value.Tag == 11 {
+			response.AppendChild(res.Value)
+		} else {
+			response.AppendChild(ber.NewString(ber.ClassContext, ber.TypePrimitive, 11, string(res.Value.Bytes()), "responseValue: "))
+		}
+	}
+	responsePacket.AppendChild(response)
+	if len(res.Controls) > 0 {
+		responsePacket.AppendChild(encodeControls(res.Controls))
+	}
+	return responsePacket
 }
 
-func HandleModifyDNRequest(ctx context.Context, req *ber.Packet, boundDN string, fns map[string]ModifyDNr, conn net.Conn) (resultCode LDAPResultCode) {
+func HandleModifyDNRequest(ctx context.Context, req *ber.Packet, fns map[string]ModifyDNr) (resultCode LDAPResultCode) {
 	if len(req.Children) != 3 && len(req.Children) != 4 {
 		return LDAPResultProtocolError
 	}
@@ -221,8 +251,8 @@ func HandleModifyDNRequest(ctx context.Context, req *ber.Packet, boundDN string,
 	for k := range fns {
 		fnNames = append(fnNames, k)
 	}
-	fn := routeFunc(boundDN, fnNames)
-	resultCode, err := fns[fn].ModifyDN(ctx, boundDN, mdnReq, conn)
+	fn := routeFunc(mdnReq.DN, fnNames)
+	resultCode, err := fns[fn].ModifyDN(ctx, mdnReq)
 	if err != nil {
 		Log.Printf("ModifyDN Error %s", err.Error())
 		return LDAPResultOperationsError

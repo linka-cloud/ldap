@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
-	"net"
 
 	"go.linka.cloud/ldap"
 )
@@ -36,16 +36,16 @@ func main() {
 
 type ldapHandler struct{}
 
-// /////////// Allow anonymous binds only
-func (h ldapHandler) Bind(ctx context.Context, bindDN, bindSimplePw string, conn net.Conn) (ldap.LDAPResultCode, error) {
-	if bindDN == "" && bindSimplePw == "" {
-		return ldap.LDAPResultSuccess, nil
+func (h ldapHandler) Bind(ctx context.Context, bindDN, bindSimplePw string) (ldap.LDAPResultCode, context.Context, error) {
+	if bindSimplePw == "password" {
+		return ldap.LDAPResultSuccess, context.WithValue(ctx, "user", bindDN), nil
 	}
-	return ldap.LDAPResultInvalidCredentials, nil
+	return ldap.LDAPResultInvalidCredentials, ctx, nil
 }
 
 // /////////// Return some hardcoded search results - we'll respond to any baseDN for testing
-func (h ldapHandler) Search(ctx context.Context, boundDN string, searchReq ldap.SearchRequest, conn net.Conn) (ldap.ServerSearchResult, error) {
+func (h ldapHandler) Search(ctx context.Context, searchReq ldap.SearchRequest) (ldap.ServerSearchResult, error) {
+	fmt.Printf("Request from %q (%v): BaseDN=%s Filter=%s\n", ctx.Value("user"), ldap.Conn(ctx).RemoteAddr(), searchReq.BaseDN, searchReq.Filter)
 	entries := []*ldap.Entry{
 		{DN: "cn=ned," + searchReq.BaseDN, Attributes: []*ldap.EntryAttribute{
 			{Name: "cn", Values: []string{"ned"}},

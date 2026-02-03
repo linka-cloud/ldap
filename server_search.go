@@ -10,14 +10,14 @@ import (
 	ber "github.com/go-asn1-ber/asn1-ber"
 )
 
-func HandleSearchRequest(ctx context.Context, req *ber.Packet, controls *[]Control, messageID uint64, boundDN string, server *Server, conn net.Conn) (resultErr error) {
+func HandleSearchRequest(ctx context.Context, req *ber.Packet, controls *[]Control, messageID uint64, server *Server, conn net.Conn) (resultErr error) {
 	defer func() {
 		if r := recover(); r != nil {
 			resultErr = NewError(LDAPResultOperationsError, fmt.Errorf("Search function panic: %s", r))
 		}
 	}()
 
-	searchReq, err := parseSearchRequest(boundDN, req, controls)
+	searchReq, err := parseSearchRequest(req, controls)
 	if err != nil {
 		return NewError(LDAPResultOperationsError, err)
 	}
@@ -32,7 +32,7 @@ func HandleSearchRequest(ctx context.Context, req *ber.Packet, controls *[]Contr
 		fnNames = append(fnNames, k)
 	}
 	fn := routeFunc(searchReq.BaseDN, fnNames)
-	searchResp, err := server.SearchFns[fn].Search(ctx, boundDN, searchReq, conn)
+	searchResp, err := server.SearchFns[fn].Search(ctx, searchReq)
 	if err != nil {
 		return NewError(searchResp.ResultCode, err)
 	}
@@ -100,7 +100,7 @@ func HandleSearchRequest(ctx context.Context, req *ber.Packet, controls *[]Contr
 }
 
 // ///////////////////////
-func parseSearchRequest(boundDN string, req *ber.Packet, controls *[]Control) (SearchRequest, error) {
+func parseSearchRequest(req *ber.Packet, controls *[]Control) (SearchRequest, error) {
 	if len(req.Children) != 8 {
 		return SearchRequest{}, NewError(LDAPResultOperationsError, errors.New("Bad search request"))
 	}

@@ -157,10 +157,11 @@ const (
 type LDAPResultCode uint8
 
 type (
-	Attribute      = ldap.Attribute
-	AddRequest     = ldap.AddRequest
-	DeleteRequest  = ldap.ModifyRequest
-	CompareRequest = ldap.CompareRequest
+	Attribute       = ldap.Attribute
+	AddRequest      = ldap.AddRequest
+	DeleteRequest   = ldap.ModifyRequest
+	CompareRequest  = ldap.CompareRequest
+	ExtendedRequest = ldap.ExtendedRequest
 )
 
 type ModifyDNRequest struct {
@@ -170,9 +171,20 @@ type ModifyDNRequest struct {
 	NewSuperior  string
 }
 
-type ExtendedRequest struct {
-	Name  string
-	Value string
+// ExtendedResponse represents the response from the directory server
+// after sending an extended request
+// See: https://www.rfc-editor.org/rfc/rfc4511#section-4.12
+type ExtendedResponse struct {
+	// ExtendedResponse ::= [APPLICATION 24] SEQUENCE {
+	//   COMPONENTS OF LDAPResult,
+	//   responseName     [10] LDAPOID OPTIONAL,
+	//   responseValue    [11] OCTET STRING OPTIONAL }
+
+	Name     string
+	Value    *ber.Packet
+	Controls []Control
+
+	ResultCode LDAPResultCode
 }
 
 func DebugBinaryFile(fileName string) error {
