@@ -287,14 +287,16 @@ func (s searchSimple) Search(ctx context.Context, searchReq SearchRequest) (Serv
 			{Name: "uid", Values: []string{"trent"}},
 			{Name: "description", Values: []string{"trent via sa"}},
 			{Name: "objectclass", Values: []string{"posixaccount"}},
+			{Name: "userAccountControl", Values: []string{"512"}},
 		}},
 		{DN: "cn=randy,o=testers,c=test", Attributes: []*EntryAttribute{
 			{Name: "cn", Values: []string{"randy"}},
 			{Name: "o", Values: []string{"ate"}},
 			{Name: "uidNumber", Values: []string{"5555"}},
-			{Name: "accountstatus", Values: []string{"active"}},
+			{Name: "accountstatus", Values: []string{"inactive"}},
 			{Name: "uid", Values: []string{"randy"}},
 			{Name: "objectclass", Values: []string{"posixaccount"}},
+			{Name: "userAccountControl", Values: []string{"514"}},
 		}},
 	}
 	return ServerSearchResult{entries, []string{}, []Control{}, LDAPResultSuccess}, nil

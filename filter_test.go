@@ -24,7 +24,7 @@ var testFilters = []compileTest{
 	{filterStr: "(sn<=Møller)", filterType: FilterLessOrEqual},
 	{filterStr: "(sn=*)", filterType: FilterPresent},
 	{filterStr: "(sn~=Müller)", filterType: FilterApproxMatch},
-	// { filterStr: "()", filterType: FilterExtensibleMatch },
+	{filterStr: "(UserAccountControl:1.2.840.113556.1.4.803:=2)", filterType: FilterExtensibleMatch},
 }
 
 func TestFilter(t *testing.T) {

@@ -115,6 +115,7 @@ func TestSearchSizelimit(t *testing.T) {
 // ///////////////////////
 func TestBindSearchMulti(t *testing.T) {
 	s := NewServer()
+	s.EnforceLDAP = true
 	s.BindFunc("", bindSimple{})
 	s.BindFunc("c=testz", bindSimple2{})
 	s.SearchFunc("", searchSimple{})
@@ -138,6 +139,15 @@ func TestBindSearchMulti(t *testing.T) {
 		}
 		if !strings.Contains(string(out), "dn: cn=hamburger,o=testers,c=testz") {
 			t.Errorf("search custom routing failed: %v", string(out))
+		}
+		cmd = exec.Command("ldapsearch", "-H", ldapURL, "-x", "-b", "o=testers,c=test",
+			"-D", "cn=testy,o=testers,c=testz", "-w", "ZLike2test", "(UserAccountControl:1.2.840.113556.1.4.803:=2)")
+		out, _ = cmd.CombinedOutput()
+		if !strings.Contains(string(out), "result: 0 Success") {
+			t.Errorf("error routing custom bind/search functions: %v", string(out))
+		}
+		if !strings.Contains(string(out), "cn=randy,o=testers,c=test") {
+			t.Errorf("search extended failed: %v", string(out))
 		}
 	})
 }

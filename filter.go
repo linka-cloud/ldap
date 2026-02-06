@@ -7,6 +7,7 @@ package ldap
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -126,6 +127,49 @@ func DecompileFilter(packet *ber.Packet) (ret string, err error) {
 		ret += ber.DecodeString(packet.Children[0].Data.Bytes())
 		ret += "~="
 		ret += ber.DecodeString(packet.Children[1].Data.Bytes())
+	case FilterExtensibleMatch:
+		var attribute string
+		var matchingRule string
+		var matchValue string
+		dnAttributes := false
+		for _, child := range packet.Children {
+			switch child.Tag {
+			case 1:
+				matchingRule = ber.DecodeString(child.Data.Bytes())
+			case 2:
+				attribute = ber.DecodeString(child.Data.Bytes())
+			case 3:
+				matchValue = ber.DecodeString(child.Data.Bytes())
+			case 4:
+				dnAttributes = true
+			}
+		}
+		if attribute == "" && matchingRule == "" {
+			return "", NewError(ErrorFilterDecompile, errors.New("ldap: extensible match missing attribute and matching rule"))
+		}
+		if matchValue == "" {
+			return "", NewError(ErrorFilterDecompile, errors.New("ldap: extensible match missing match value"))
+		}
+		if attribute != "" {
+			ret += attribute
+		}
+		if attribute == "" {
+			if dnAttributes {
+				ret += ":dn"
+			}
+			if matchingRule != "" {
+				ret += ":" + matchingRule
+			}
+		} else {
+			if dnAttributes {
+				ret += ":dn"
+			}
+			if matchingRule != "" {
+				ret += ":" + matchingRule
+			}
+		}
+		ret += ":="
+		ret += matchValue
 	}
 
 	ret += ")"
@@ -179,6 +223,61 @@ func compileFilter(filter string, pos int) (*ber.Packet, int, error) {
 		packet.AppendChild(child)
 		return packet, newPos, err
 	default:
+		closePos := strings.Index(filter[pos:], ")")
+		if closePos == -1 {
+			err = NewError(ErrorFilterCompile, errors.New("ldap: unexpected end of filter"))
+			return nil, pos, err
+		}
+		segment := filter[pos : pos+closePos]
+		if strings.Contains(segment, ":=") {
+			packet = ber.Encode(ber.ClassContext, ber.TypeConstructed, FilterExtensibleMatch, nil, FilterMap[FilterExtensibleMatch])
+			leftRight := strings.SplitN(segment, ":=", 2)
+			if len(leftRight) != 2 || leftRight[1] == "" {
+				err = NewError(ErrorFilterCompile, errors.New("ldap: error parsing extensible match"))
+				return packet, pos, err
+			}
+			left := leftRight[0]
+			matchValue := leftRight[1]
+			parts := strings.Split(left, ":")
+			attribute := ""
+			matchingRule := ""
+			dnAttributes := false
+			start := 0
+			if parts[0] != "" {
+				attribute = parts[0]
+				start = 1
+			}
+			for i := start; i < len(parts); i++ {
+				switch parts[i] {
+				case "dn":
+					dnAttributes = true
+				case "":
+					err = NewError(ErrorFilterCompile, errors.New("ldap: error parsing extensible match"))
+					return packet, pos, err
+				default:
+					if matchingRule != "" {
+						err = NewError(ErrorFilterCompile, errors.New("ldap: error parsing extensible match"))
+						return packet, pos, err
+					}
+					matchingRule = parts[i]
+				}
+			}
+			if attribute == "" && matchingRule == "" {
+				err = NewError(ErrorFilterCompile, errors.New("ldap: error parsing extensible match"))
+				return packet, pos, err
+			}
+			if matchingRule != "" {
+				packet.AppendChild(ber.NewString(ber.ClassContext, ber.TypePrimitive, 1, matchingRule, "Matching Rule"))
+			}
+			if attribute != "" {
+				packet.AppendChild(ber.NewString(ber.ClassContext, ber.TypePrimitive, 2, attribute, "Attribute"))
+			}
+			packet.AppendChild(ber.NewString(ber.ClassContext, ber.TypePrimitive, 3, matchValue, "Match Value"))
+			if dnAttributes {
+				packet.AppendChild(ber.NewLDAPBoolean(ber.ClassContext, ber.TypePrimitive, 4, true, "DN Attributes"))
+			}
+			return packet, pos + closePos + 1, nil
+		}
 		attribute := ""
 		condition := ""
 
@@ -344,8 +443,49 @@ func ServerApplyFilter(f *ber.Packet, entry *Entry) (bool, LDAPResultCode) {
 		return false, LDAPResultOperationsError
 	case "FilterApproxMatch": // TODO
 		return false, LDAPResultOperationsError
-	case "FilterExtensibleMatch": // TODO
-		return false, LDAPResultOperationsError
+	case "Extensible Match":
+		if len(f.Children) == 0 {
+			return false, LDAPResultOperationsError
+		}
+		var attribute string
+		var matchingRule string
+		var matchValue string
+		for _, child := range f.Children {
+			switch child.Tag {
+			case 1:
+				matchingRule = ber.DecodeString(child.Data.Bytes())
+			case 2:
+				attribute = ber.DecodeString(child.Data.Bytes())
+			case 3:
+				matchValue = ber.DecodeString(child.Data.Bytes())
+			}
+		}
+		if attribute == "" || matchValue == "" {
+			return false, LDAPResultOperationsError
+		}
+		switch matchingRule {
+		case "1.2.840.113556.1.4.803":
+			matchInt, parseErr := strconv.ParseInt(matchValue, 10, 64)
+			if parseErr != nil {
+				return false, LDAPResultOperationsError
+			}
+			for _, a := range entry.Attributes {
+				if strings.EqualFold(a.Name, attribute) {
+					for _, v := range a.Values {
+						valueInt, valueErr := strconv.ParseInt(v, 10, 64)
+						if valueErr != nil {
+							continue
+						}
+						if valueInt&matchInt == matchInt {
+							return true, LDAPResultSuccess
+						}
+					}
+				}
+			}
+			return false, LDAPResultSuccess
+		default:
+			return false, LDAPResultOperationsError
+		}
 	}
 
 	return false, LDAPResultSuccess
